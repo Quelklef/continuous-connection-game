@@ -19,6 +19,7 @@
 	let player: Player | null = $state(null);
 	let swapped: boolean = $state(false);
 	let svg: SVGSVGElement;
+
 	const playerFromIndex = (index: number): Player => {
 		return index % 2 === 0 ? 1 : 2;
 	};
@@ -33,6 +34,7 @@
 				return "blue";
 		}
 	};
+
 	const setMouseLoc = (e: MouseEvent): void => {
 		const p = new DOMPoint(e.clientX, e.clientY);
 		const { x, y } = p.matrixTransform(svg.getScreenCTM()?.inverse());

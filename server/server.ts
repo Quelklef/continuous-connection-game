@@ -37,6 +37,7 @@ const send = (ws: WebSocket, msg: ServerMessage): void =>
 const numConnections = (): number => Object.keys(connections).length;
 
 const logConnections = () => console.log(Object.keys(connections));
+
 wss.on("connection", (ws) => {
 	if (numConnections() >= 2) {
 		ws.send(JSON.stringify({ type: "full" }));
@@ -59,6 +60,7 @@ wss.on("connection", (ws) => {
 		});
 
 		ws.on("error", console.error);
+
 		ws.on("message", (data) => {
 			Bad.handle(
 				parseWs(data.toString()),
