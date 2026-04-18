@@ -17,6 +17,7 @@
 	let connected = false;
 	let id: number | null = null;
 	let player: Player | null = $state(null);
+	let swapped: boolean = $state(false);
 	let svg: SVGSVGElement;
 	const playerFromIndex = (index: number): Player => {
 		return index % 2 === 0 ? 1 : 2;
@@ -57,6 +58,7 @@
 					else return new Bad("assign player gone wrong");
 				case "full":
 				case "undo":
+				case "swap":
 					return parsed;
 				default:
 					ensureCoverage(parsed);
@@ -95,6 +97,9 @@
 							case "undo":
 								moves.pop();
 								break;
+							case "swap":
+								swap();
+								break;
 							default:
 								ensureCoverage(msg);
 						}
@@ -104,7 +109,17 @@
 			});
 		}
 	});
+
 	const size = 14;
+
+	const swap = () => {
+		if (moves.length === 1 && !swapped) {
+			swapped = true;
+			if (player === 1) player = 2;
+			else player = 1;
+		}
+	};
+
 </script>
 
 <div
@@ -163,4 +178,13 @@
 			if (playerMode !== 1) send(playerMode.socket, { type: "undo" });
 		}}>undo</button
 	>
+	{#if playerMode !== 1}
+		<button
+			disabled={moves.length !== 1 || !myTurn || swapped}
+			onclick={() => {
+				swap();
+				send(playerMode.socket, { type: "swap" });
+			}}>swap</button
+		>
+	{/if}
 </div>

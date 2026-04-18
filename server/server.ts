@@ -20,6 +20,7 @@ const parseWs = (data: string): ClientMessage | Bad => {
 					return parsed;
 				else return new Bad("'move' type has incorrect data");
 			case "undo":
+			case "swap":
 				return parsed;
 			default:
 				ensureCoverage(parsed.message);
@@ -71,6 +72,7 @@ wss.on("connection", (ws) => {
 							otherClients.forEach((client) => send(client, message));
 							break;
 						case "undo":
+						case "swap":
 							otherClients.forEach((client) => send(client, message));
 							break;
 						default:
