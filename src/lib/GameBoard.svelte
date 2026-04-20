@@ -121,7 +121,6 @@
 			else player = 1;
 		}
 	};
-
 </script>
 
 <div
