@@ -17,7 +17,7 @@
 
             client = {
               description = "run the dev client";
-              script = ''bun run dev'';
+              script = ''bun run dev --host'';
             };
 
             server = {
