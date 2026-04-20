@@ -4,7 +4,10 @@
 	let moves = $state([]);
 	let playerMode: 1 | { socket: WebSocket } = $state(1);
 	onMount(
-		() => (playerMode = { socket: new WebSocket("ws://localhost:8090") }),
+		() =>
+			(playerMode = {
+				socket: new WebSocket(`ws://${location.hostname}:8090`),
+			}),
 	);
 </script>
 
