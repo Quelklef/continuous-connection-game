@@ -11,4 +11,4 @@
 	);
 </script>
 
-<GameBoard bind:moves {playerMode} />
+<GameBoard size={14} bind:moves {playerMode} />

@@ -7,10 +7,11 @@
 		Player,
 	} from "../../shared/types.ts";
 	type Props = {
+		size: number;
 		moves: MoveData[];
 		playerMode?: 1 | { socket: WebSocket };
 	};
-	let { moves = $bindable(), playerMode = 1 }: Props = $props();
+	let { size, moves = $bindable(), playerMode = 1 }: Props = $props();
 	let mouseLoc: [number, number] = $state([0, 0]);
 	let index: number = $derived(moves.length);
 	let mouseOver = $state(false);
@@ -116,8 +117,6 @@
 		moves.pop();
 		swapped = false;
 	};
-
-	const size = 14;
 
 	const swap = () => {
 		if (moves.length === 1 && !swapped) {

@@ -3,4 +3,4 @@
 	let moves = $state([]);
 </script>
 
-<GameBoard bind:moves />
+<GameBoard size={14} bind:moves />
