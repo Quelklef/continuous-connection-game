@@ -137,7 +137,7 @@
 		bind:this={svg}
 		viewBox={`0 0 ${size} ${size}`}
 		onmouseenter={(e) => {
-			mouseLoc = [e.pageX, e.pageY];
+			setMouseLoc(e);
 			mouseOver = true;
 		}}
 		onmouseleave={() => (mouseOver = false)}
