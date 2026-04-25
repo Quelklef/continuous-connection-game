@@ -270,6 +270,7 @@
 		}}
 		oncontextmenu={(e) => e.preventDefault()}
 		onwheel={(e) => {
+			e.preventDefault();
 			if (e.deltaY < 0) zoom("in");
 			else zoom("out");
 		}}
