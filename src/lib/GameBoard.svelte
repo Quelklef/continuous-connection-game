@@ -159,6 +159,9 @@
 		get yMax() {
 			return this.center[1] + this.apo;
 		}
+		copy(): ViewBox {
+			return new ViewBox({ apo: this.apo, center: [...this.center] });
+		}
 		constructor(vb: { apo: number; center: [number, number] }) {
 			this.apo = $state(vb.apo);
 			this.center = $state(vb.center);
@@ -166,10 +169,12 @@
 	}
 
 	// svelte-ignore state_referenced_locally
-	let viewBox: ViewBox = new ViewBox({
+	let defaultViewBox: ViewBox = new ViewBox({
 		apo: size / 2,
 		center: [size / 2, size / 2],
 	});
+
+	let viewBox: ViewBox = $state(defaultViewBox.copy());
 
 	let svgViewBox = $derived.by(() => {
 		const x = viewBox.center[0] - viewBox.apo;
@@ -199,11 +204,15 @@
 				];
 				break;
 			case "out":
-				viewBox.apo = Math.min(viewBox.apo / 0.9, size / 2);
-				viewBox.center = [
-					mouseLoc[0] - mouseXPercent * viewBox.size + viewBox.apo,
-					mouseLoc[1] - mouseYPercent * viewBox.size + viewBox.apo,
-				];
+				if (viewBox.apo / 0.9 >= size / 2) {
+					viewBox = defaultViewBox.copy();
+				} else {
+					viewBox.apo = viewBox.apo / 0.9;
+					viewBox.center = [
+						mouseLoc[0] - mouseXPercent * viewBox.size + viewBox.apo,
+						mouseLoc[1] - mouseYPercent * viewBox.size + viewBox.apo,
+					];
+				}
 				break;
 			default:
 				ensureCoverage(z);
