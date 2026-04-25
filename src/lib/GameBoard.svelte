@@ -114,6 +114,7 @@
 
 	const undo = (): void => {
 		moves.pop();
+		swapped = false;
 	};
 
 	const size = 14;
