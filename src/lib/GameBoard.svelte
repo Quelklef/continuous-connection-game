@@ -26,6 +26,7 @@
 	};
 	let panning: null | PanningData = $state(null);
 	let svg: SVGSVGElement;
+	let shiftDown: boolean = $state(false);
 
 	const playerFromIndex = (index: number): Player => {
 		return index % 2 === 0 ? 1 : 2;
@@ -222,6 +223,15 @@
 	};
 </script>
 
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === "Shift") shiftDown = true;
+	}}
+	onkeyup={(e) => {
+		if (e.key === "Shift") shiftDown = false;
+	}}
+/>
+
 <div
 	style:display="flex"
 	style:justify-content="center"
@@ -288,7 +298,9 @@
 				y={coords[1] - 1 / 2}
 				width="1"
 				height="1"
-				fill={playerColor(playerFromIndex(index))}
+				fill={index === moves.length - 1 && shiftDown
+					? "black"
+					: playerColor(playerFromIndex(index))}
 			></rect>
 		{/snippet}
 
