@@ -162,6 +162,40 @@
 		const size = 2 * viewBox.apo;
 		return `${x} ${y} ${size} ${size}`;
 	});
+
+	type Zoom = "in" | "out";
+
+	const shiftViewBox = () => {
+		if (viewBox.xMin < 0) viewBox.center[0] -= viewBox.xMin;
+		else if (viewBox.xMax > size) viewBox.center[0] -= viewBox.xMax - size;
+		if (viewBox.yMin < 0) viewBox.center[1] -= viewBox.yMin;
+		else if (viewBox.yMax > size) viewBox.center[1] -= viewBox.yMax - size;
+	};
+
+	const zoom = (z: Zoom) => {
+		const mouseXPercent = (mouseLoc[0] - viewBox.xMin) / viewBox.size;
+		const mouseYPercent = (mouseLoc[1] - viewBox.yMin) / viewBox.size;
+		switch (z) {
+			case "in":
+				viewBox.apo *= 0.9;
+				viewBox.center = [
+					mouseLoc[0] - mouseXPercent * viewBox.size + viewBox.apo,
+					mouseLoc[1] - mouseYPercent * viewBox.size + viewBox.apo,
+				];
+				break;
+			case "out":
+				viewBox.apo = Math.min(viewBox.apo / 0.9, size / 2);
+				viewBox.center = [
+					mouseLoc[0] - mouseXPercent * viewBox.size + viewBox.apo,
+					mouseLoc[1] - mouseYPercent * viewBox.size + viewBox.apo,
+				];
+				break;
+			default:
+				ensureCoverage(z);
+		}
+
+		shiftViewBox();
+	};
 </script>
 
 <div
@@ -187,6 +221,10 @@
 				moves.push(mouseLoc);
 				send(playerMode.socket, { type: "move", data: mouseLoc });
 			}
+		}}
+		onwheel={(e) => {
+			if (e.deltaY < 0) zoom("in");
+			else zoom("out");
 		}}
 		style:width="min(90vh,90vw)"
 		style:height="min(90vh,90vw)"
