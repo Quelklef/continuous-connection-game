@@ -97,7 +97,7 @@
 								player = msg.data;
 								break;
 							case "undo":
-								moves.pop();
+								undo();
 								break;
 							case "swap":
 								swap();
@@ -111,6 +111,10 @@
 			});
 		}
 	});
+
+	const undo = (): void => {
+		moves.pop();
+	};
 
 	const size = 14;
 
@@ -175,7 +179,7 @@
 	<button
 		disabled={playerMode !== 1 && myTurn}
 		onclick={() => {
-			moves.pop();
+			undo();
 			if (playerMode !== 1) send(playerMode.socket, { type: "undo" });
 		}}>undo</button
 	>
