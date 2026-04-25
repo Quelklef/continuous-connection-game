@@ -15,12 +15,12 @@
           shelpers."."."General" = {
             inherit shelp;
 
-            client = {
+            "client.run" = {
               description = "run the dev client";
               script = ''bun run dev --host'';
             };
 
-            server = {
+            "ws-server.run" = {
               description = "run the websocket";
               script = ''bun run server/server.js'';
             };
