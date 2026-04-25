@@ -19,6 +19,12 @@
 	let id: number | null = null;
 	let player: Player | null = $state(null);
 	let swapped: boolean = $state(false);
+	type PanningData = {
+		initialMouseCoords: [number, number];
+		initialBoxCenter: [number, number];
+		transformer: (x: number, y: number) => [number, number];
+	};
+	let panning: null | PanningData = $state(null);
 	let svg: SVGSVGElement;
 
 	const playerFromIndex = (index: number): Player => {
@@ -36,11 +42,20 @@
 		}
 	};
 
-	const setMouseLoc = (e: MouseEvent): void => {
-		const p = new DOMPoint(e.clientX, e.clientY);
-		const { x, y } = p.matrixTransform(svg.getScreenCTM()?.inverse());
-		mouseLoc = [x, y];
+	const svgTransformer = (
+		svg: SVGSVGElement,
+	): ((x: number, y: number) => [number, number]) => {
+		const matrix = svg.getScreenCTM()?.inverse();
+		return (oldX, oldY) => {
+			//console.log(matrix);
+			const p = new DOMPoint(oldX, oldY);
+			const { x, y } = p.matrixTransform(matrix);
+			return [x, y];
+		};
 	};
+
+	const setMouseLoc = (e: MouseEvent) =>
+		(mouseLoc = svgTransformer(svg)(e.clientX, e.clientY));
 
 	const parseWs = (data: string): ServerMessage | Bad => {
 		try {
@@ -212,16 +227,39 @@
 			mouseOver = true;
 		}}
 		onmouseleave={() => (mouseOver = false)}
-		onmousemove={setMouseLoc}
-		onmousedown={(e) => {
-			setMouseLoc(e);
-			if (playerMode === 1) {
-				moves.push(mouseLoc);
-			} else if (myTurn && connected) {
-				moves.push(mouseLoc);
-				send(playerMode.socket, { type: "move", data: mouseLoc });
+		onmousemove={(e) => {
+			if (panning === null) {
+				setMouseLoc(e);
+			} else {
+				const [newX, newY] = panning.transformer(e.clientX, e.clientY);
+				viewBox.center[0] =
+					panning.initialBoxCenter[0] - (newX - panning.initialMouseCoords[0]);
+				viewBox.center[1] =
+					panning.initialBoxCenter[1] - (newY - panning.initialMouseCoords[1]);
+				shiftViewBox();
 			}
 		}}
+		onmousedown={(e) => {
+			setMouseLoc(e);
+			if (e.button === 0) {
+				if (playerMode === 1) {
+					moves.push(mouseLoc);
+				} else if (myTurn && connected) {
+					moves.push(mouseLoc);
+					send(playerMode.socket, { type: "move", data: mouseLoc });
+				}
+			} else if (e.button === 2) {
+				panning = {
+					initialMouseCoords: mouseLoc,
+					initialBoxCenter: [...viewBox.center],
+					transformer: svgTransformer(svg),
+				};
+			}
+		}}
+		onmouseup={(e) => {
+			if (e.button === 2) panning = null;
+		}}
+		oncontextmenu={(e) => e.preventDefault()}
 		onwheel={(e) => {
 			if (e.deltaY < 0) zoom("in");
 			else zoom("out");
