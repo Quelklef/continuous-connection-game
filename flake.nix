@@ -24,6 +24,16 @@
               description = "run the websocket";
               script = ''bun run server/server.js'';
             };
+
+            "client.check" = {
+              description = "Run type check watching on the client codebase";
+              script = ''bun check --watch'';
+            };
+
+            "ws-server.check" = {
+              description = "Run type check watching on the the websocket server codebase";
+              script = ''tsc -w --noEmit --strict --noUnusedLocals --noUnusedParameters --allowImportingTsExtensions server/server.ts'';
+            };
           };
         })
       ];
