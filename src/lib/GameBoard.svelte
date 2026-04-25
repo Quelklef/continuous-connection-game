@@ -125,6 +125,43 @@
 			else player = 1;
 		}
 	};
+
+	class ViewBox {
+		apo: number;
+		center: [number, number];
+		get size() {
+			return 2 * this.apo;
+		}
+		get xMin() {
+			return this.center[0] - this.apo;
+		}
+		get xMax() {
+			return this.center[0] + this.apo;
+		}
+		get yMin() {
+			return this.center[1] - this.apo;
+		}
+		get yMax() {
+			return this.center[1] + this.apo;
+		}
+		constructor(vb: { apo: number; center: [number, number] }) {
+			this.apo = $state(vb.apo);
+			this.center = $state(vb.center);
+		}
+	}
+
+	// svelte-ignore state_referenced_locally
+	let viewBox: ViewBox = new ViewBox({
+		apo: size / 2,
+		center: [size / 2, size / 2],
+	});
+
+	let svgViewBox = $derived.by(() => {
+		const x = viewBox.center[0] - viewBox.apo;
+		const y = viewBox.center[1] - viewBox.apo;
+		const size = 2 * viewBox.apo;
+		return `${x} ${y} ${size} ${size}`;
+	});
 </script>
 
 <div
@@ -135,7 +172,7 @@
 >
 	<svg
 		bind:this={svg}
-		viewBox={`0 0 ${size} ${size}`}
+		viewBox={svgViewBox}
 		onmouseenter={(e) => {
 			setMouseLoc(e);
 			mouseOver = true;
