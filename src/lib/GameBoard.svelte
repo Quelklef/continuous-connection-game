@@ -267,7 +267,10 @@
 		style:width="min(90vh,90vw)"
 		style:height="min(90vh,90vw)"
 		style:border="10px solid"
-		style:border-color="red blue"
+		style:border-top-color={viewBox.yMin === 0 ? "red" : "black"}
+		style:border-bottom-color={viewBox.yMax === size ? "red" : "black"}
+		style:border-left-color={viewBox.xMin === 0 ? "blue" : "black"}
+		style:border-right-color={viewBox.xMax === size ? "blue" : "black"}
 	>
 		{#snippet shape(coords: [number, number], index: number)}
 			<rect
