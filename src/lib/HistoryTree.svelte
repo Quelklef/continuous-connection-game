@@ -130,6 +130,10 @@
 			class="treeSvg"
 			viewBox={`0 0 ${svgWidth} ${svgHeight}`}
 			preserveAspectRatio="xMinYMin meet"
+			oncontextmenu={(e) => {
+				e.preventDefault();
+				e.stopPropagation();
+			}}
 		>
 			{#each nodeIds as id (id)}
 				{@const n = nodes[id]}
