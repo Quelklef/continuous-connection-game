@@ -162,6 +162,18 @@
 						class:active={isActive(id)}
 						class:hovered={isHovered(id)}
 						onpointerenter={() => (isHoverEnabled ? setHover(id) : undefined)}
+						onpointerdown={(e) => {
+							if (e.button !== 2) return;
+							e.preventDefault();
+							e.stopPropagation();
+							if (!isClickEnabled) return;
+							if (e.ctrlKey) {
+								select(id);
+								return;
+							}
+							if (!canDelete(id)) return;
+							del(id);
+						}}
 						role="button"
 						tabindex={isClickEnabled ? 0 : -1}
 						onclick={(e) => {
