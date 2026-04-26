@@ -458,22 +458,6 @@
 	};
 
 	$effect(() => {
-		if (typeof window === "undefined") return;
-		if (!panSession) return;
-
-		const onContextMenu = (e: Event) => {
-			e.preventDefault();
-		};
-
-		window.addEventListener("contextmenu", onContextMenu, { capture: true });
-		return () => {
-			window.removeEventListener("contextmenu", onContextMenu, {
-				capture: true,
-			});
-		};
-	});
-
-	$effect(() => {
 		if (viewBox.w === 0 && viewBox.h === 0) {
 			viewBox = { x: 0, y: 0, w: size, h: size };
 			lastSize = size;
