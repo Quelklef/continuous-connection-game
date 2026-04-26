@@ -6,10 +6,32 @@
 		<meta name="text-scale" content="scale" />
 		%sveltekit.head%
 		<style>
+			:root {
+				--page-bg-1: #b9b0a2;
+				--page-bg-2: #8fa4b2;
+				--board-bg: #f3efe6;
+			}
+
 			body {
 				margin: 0;
-				background: #c1b9ab;
-				font-family: monospace;
+				background:
+					radial-gradient(
+						1200px 900px at 20% 10%,
+						rgba(255, 255, 255, 0.35),
+						rgba(255, 255, 255, 0) 55%
+					),
+					linear-gradient(135deg, var(--page-bg-1), var(--page-bg-2));
+				font-family:
+					ui-sans-serif,
+					system-ui,
+					-apple-system,
+					"Segoe UI",
+					Roboto,
+					Helvetica,
+					Arial,
+					"Apple Color Emoji",
+					"Segoe UI Emoji";
+				color: rgba(0, 0, 0, 0.86);
 			}
 		</style>
 	</head>
