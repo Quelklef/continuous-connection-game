@@ -1390,8 +1390,8 @@
 		return out;
 	};
 
-	const importSharedOverlaySubtree = (): void => {
-		const subtreeKeys = overlaySubtreeRootedAt(activeKey);
+	const importSharedOverlaySubtree = (root: StableKey): void => {
+		const subtreeKeys = overlaySubtreeRootedAt(root);
 		if (subtreeKeys.length === 0) return;
 
 		const idByKey: Record<string, NodeId> = { ...baselineIdByKey };
@@ -2138,12 +2138,20 @@
 		sharedPreviewHolderCount > 0 || isSharedPreviewEditEnabled,
 	);
 
+	const saveKey = $derived(
+		(() => {
+			if (isPreviewEnabled && hasStagedBaselineChanges) return activeKey;
+			if (!isSharedOverlayVisible) return activeKey;
+			return hoverKey ?? activeKey;
+		})(),
+	);
+
 	const isSaveShown = $derived(
 		(() => {
 			void sharedOverlayVersion;
 			if (isPreviewEnabled && hasStagedBaselineChanges) return true;
 			if (!isSharedOverlayVisible) return false;
-			return overlaySubtreeRootedAt(activeKey).length > 0;
+			return overlaySubtreeRootedAt(saveKey).length > 0;
 		})(),
 	);
 
@@ -2155,7 +2163,7 @@
 
 	const save = (): void => {
 		if (isPreviewEnabled && hasStagedBaselineChanges) saveLocalStagedPreview();
-		else importSharedOverlaySubtree();
+		else importSharedOverlaySubtree(saveKey);
 	};
 </script>
 
@@ -2478,6 +2486,7 @@
 				isHoverEnabled={true}
 				isClickEnabled={isHistoryClickEnabled}
 				{isSaveShown}
+				{saveKey}
 				{saveTitle}
 				{save}
 				setHover={setHoverCursor}

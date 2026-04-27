@@ -19,6 +19,7 @@
 		isHoverEnabled: boolean;
 		isClickEnabled: boolean;
 		isSaveShown: boolean;
+		saveKey: StableKey;
 		saveTitle: string;
 		save: () => void;
 
@@ -38,6 +39,7 @@
 		isHoverEnabled,
 		isClickEnabled,
 		isSaveShown,
+		saveKey,
 		saveTitle,
 		save,
 		setHover,
@@ -258,7 +260,7 @@
 							stroke-width={isReal(key) ? 2 : 1}
 							vector-effect="non-scaling-stroke"
 						></circle>
-						{#if isSaveShown && isActive(key)}
+						{#if isSaveShown && key === saveKey}
 							<g
 								class="saveBtn"
 								transform={`translate(${r + 8} ${-(r + 8)})`}
