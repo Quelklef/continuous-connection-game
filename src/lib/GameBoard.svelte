@@ -74,6 +74,7 @@
 
 	let mouseLoc: [number, number] = $state([0, 0]);
 	let mouseOver = $state(false);
+	let mouseOverHistory = $state(false);
 	let connected = $state(false);
 	let id: number | null = null;
 	let assignedPlayer: Player | null = $state(null);
@@ -1911,7 +1912,7 @@
 		}
 
 		if (e.button === 0) {
-			if (hoverKey !== null) return;
+			if (mouseOverHistory) return;
 
 			if (playerMode === 1) {
 				setRealCursor(advanceFrom(realCursorId, mouseLoc));
@@ -2448,7 +2449,11 @@
 		<div
 			class="historyPanel"
 			class:preview={isPreviewEnabled}
-			onpointerleave={() => setHoverCursor(null)}
+			onpointerenter={() => (mouseOverHistory = true)}
+			onpointerleave={() => {
+				mouseOverHistory = false;
+				setHoverCursor(null);
+			}}
 		>
 			<div class="historyHeader">
 				<div>game tree</div>
