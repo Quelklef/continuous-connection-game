@@ -38,6 +38,7 @@
 
 		isUndoDisabled: boolean;
 		undo: () => void;
+		newGame: () => void;
 
 		isSwapShown: boolean;
 		isSwapDisabled: boolean;
@@ -82,6 +83,7 @@
 
 		isUndoDisabled,
 		undo,
+		newGame,
 
 		isSwapShown,
 		isSwapDisabled,
@@ -387,6 +389,16 @@
 						switch
 					</button>
 				{/if}
+				<button class="btn btnDanger" title="Reset to a new game" onclick={newGame}>
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M7 6h10l-1 14H8L7 6Zm2-2h6l1 2H8l1-2Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					</svg>
+					new game
+				</button>
 			</div>
 		</div>
 
@@ -959,6 +971,17 @@
 		opacity: 0.5;
 		cursor: not-allowed;
 		transform: none;
+	}
+
+	.btnDanger {
+		border-color: rgba(180, 20, 40, 0.28);
+		background: rgba(255, 255, 255, 0.92);
+		color: rgba(160, 20, 40, 0.92);
+	}
+
+	.btnDanger:hover {
+		border-color: rgba(180, 20, 40, 0.4);
+		background: rgba(255, 240, 242, 0.95);
 	}
 
 	.kvLabel {

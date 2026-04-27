@@ -976,6 +976,24 @@
 		};
 	});
 
+	const newGame = (): void => {
+		resetHistory();
+		viewBox = { x: 0, y: 0, w: size, h: size };
+		isPreviewMode = false;
+
+		if (typeof window === "undefined") return;
+		let ok: boolean;
+		let err: unknown;
+		try {
+			localStorage.removeItem(gameStateStorageKey);
+			ok = true;
+		} catch (e) {
+			err = e;
+			ok = false;
+		}
+		if (!ok) console.warn("failed to clear persisted game state", err);
+	};
+
 	$effect(() => {
 		if (typeof window === "undefined") return;
 		if (isColorInitialized) return;
@@ -1701,6 +1719,7 @@
 						send(playerMode.socket, { type: "undo" });
 					}
 				}}
+				{newGame}
 				isSwapShown={true}
 				isSwapDisabled={playerMode === 1
 					? realMoveCount !== 1 || nodeAt(realCursorId).playersSwapped
