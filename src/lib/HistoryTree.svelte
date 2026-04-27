@@ -1,41 +1,44 @@
 <script lang="ts">
-	type NodeId = number;
-	type HistoryNode = {
-		id: NodeId;
-		parent: NodeId | null;
+	import type { StableKey } from "../../shared/types.ts";
+
+	type RenderNode = {
+		key: StableKey;
+		parentKey: StableKey | null;
 		ply: number;
 		kind: "root" | "stone" | "swap";
-		children: NodeId[];
+		layer: "baseline" | "shared";
 	};
 
 	type Props = {
-		nodes: (HistoryNode | null)[];
-		rootId: NodeId;
-		realCursorId: NodeId;
-		realPathById: Record<number, true>;
-		activeCursorId: NodeId;
-		hoverCursorId: NodeId | null;
+		nodes: RenderNode[];
+		rootKey: StableKey;
+		realKey: StableKey;
+		realPathByKey: Record<string, true>;
+		activeKey: StableKey;
+		hoverKey: StableKey | null;
 		isHoverEnabled: boolean;
 		isClickEnabled: boolean;
 		isSaveShown: boolean;
+		saveTitle: string;
 		save: () => void;
 
-		setHover: (id: NodeId | null) => void;
-		select: (id: NodeId) => void;
-		canDelete: (id: NodeId) => boolean;
-		del: (id: NodeId) => void;
+		setHover: (key: StableKey | null) => void;
+		select: (key: StableKey) => void;
+		canDelete: (key: StableKey) => boolean;
+		del: (key: StableKey) => void;
 	};
 
 	let {
 		nodes,
-		rootId,
-		realCursorId,
-		realPathById,
-		activeCursorId,
-		hoverCursorId,
+		rootKey,
+		realKey,
+		realPathByKey,
+		activeKey,
+		hoverKey,
 		isHoverEnabled,
 		isClickEnabled,
 		isSaveShown,
+		saveTitle,
 		save,
 		setHover,
 		select,
@@ -50,67 +53,98 @@
 
 	type Pos = { x: number; y: number };
 
-	let nodeIds = $derived(
+	const nodesByKey = $derived(
 		(() => {
-			const out: NodeId[] = [];
-			const seen = new Set<NodeId>();
-			const stack: NodeId[] = [rootId];
+			const out = new Map<StableKey, RenderNode>();
+			for (const n of nodes) out.set(n.key, n);
+			return out;
+		})(),
+	);
+
+	const childrenByKey = $derived(
+		(() => {
+			const out: Record<string, StableKey[]> = {};
+			for (const n of nodes) {
+				if (n.parentKey === null) continue;
+				const k = n.parentKey;
+				const existing = out[k] ?? [];
+				existing.push(n.key);
+				out[k] = existing;
+			}
+			for (const k of Object.keys(out))
+				out[k] = (out[k] ?? []).toSorted((a, b) => a.localeCompare(b));
+			return out;
+		})(),
+	);
+
+	let nodeKeys = $derived(
+		(() => {
+			const out: StableKey[] = [];
+			const seen = new Set<StableKey>();
+			const stack: StableKey[] = [rootKey];
 
 			while (stack.length > 0) {
-				const id = stack.pop();
-				if (id === undefined) break;
-				if (seen.has(id)) continue;
-				seen.add(id);
+				const key = stack.pop();
+				if (key === undefined) break;
+				if (seen.has(key)) continue;
+				seen.add(key);
 
-				const n = nodes[id];
+				const n = nodesByKey.get(key);
 				if (!n) continue;
-				out.push(id);
+				out.push(key);
 
-				for (let i = n.children.length - 1; i >= 0; i -= 1) {
-					stack.push(n.children[i]!);
+				const children = childrenByKey[key] ?? [];
+				for (let i = children.length - 1; i >= 0; i -= 1) {
+					stack.push(children[i]!);
 				}
 			}
 
-			out.sort((a, b) => a - b);
+			out.sort((a, b) => {
+				const ap = nodesByKey.get(a)?.ply ?? 0;
+				const bp = nodesByKey.get(b)?.ply ?? 0;
+				return ap - bp || a.localeCompare(b);
+			});
 			return out;
 		})(),
 	);
 
 	let maxPly = $derived(
-		nodeIds.reduce((m, id) => Math.max(m, nodes[id]?.ply ?? 0), 0),
+		nodeKeys.reduce((m, k) => Math.max(m, nodesByKey.get(k)?.ply ?? 0), 0),
 	);
 
 	let { positions, maxLeafIndex } = $derived(
-		((): { positions: Record<number, Pos>; maxLeafIndex: number } => {
-			const yIndexById: Record<number, number> = {};
+		((): { positions: Record<string, Pos>; maxLeafIndex: number } => {
+			const yIndexByKey: Record<string, number> = {};
 			let nextLeafIndex = 0;
 
-			const assignY = (id: NodeId): number => {
-				const n = nodes[id];
+			const assignY = (key: StableKey): number => {
+				const n = nodesByKey.get(key);
 				if (!n) return nextLeafIndex;
 
-				const children = n.children.filter((childId) => !!nodes[childId]);
+				const children = (childrenByKey[key] ?? []).filter((childKey) =>
+					nodesByKey.has(childKey),
+				);
 				if (children.length === 0) {
 					const y = nextLeafIndex;
 					nextLeafIndex += 1;
-					yIndexById[id] = y;
+					yIndexByKey[key] = y;
 					return y;
 				}
 
 				const childYs = children.map(assignY).sort((a, b) => a - b);
 				const y = (childYs[0]! + childYs[childYs.length - 1]!) / 2;
-				yIndexById[id] = y;
+				yIndexByKey[key] = y;
 				return y;
 			};
 
-			assignY(rootId);
+			assignY(rootKey);
 
-			const out: Record<number, Pos> = {};
-			for (const id of nodeIds) {
-				const n = nodes[id];
+			const out: Record<string, Pos> = {};
+			for (const key of nodeKeys) {
+				const n = nodesByKey.get(key);
 				if (!n) continue;
-				const yIndex = yIndexById[id] ?? 0;
-				out[id] = {
+				const yIndex = yIndexByKey[key] ?? 0;
+				out[key] = {
 					x: margin + n.ply * xStep,
 					y: margin + yIndex * yStep,
 				};
@@ -122,11 +156,11 @@
 	let svgWidth = $derived(margin * 2 + (maxPly + 1) * xStep);
 	let svgHeight = $derived(margin * 2 + maxLeafIndex * yStep);
 
-	const isRoot = (id: NodeId): boolean => id === rootId;
-	const isOnRealPath = (id: NodeId): boolean => !!realPathById[id];
-	const isReal = (id: NodeId): boolean => id === realCursorId;
-	const isActive = (id: NodeId): boolean => id === activeCursorId;
-	const isHovered = (id: NodeId): boolean => hoverCursorId === id;
+	const isRoot = (key: StableKey): boolean => key === rootKey;
+	const isOnRealPath = (key: StableKey): boolean => !!realPathByKey[key];
+	const isReal = (key: StableKey): boolean => key === realKey;
+	const isActive = (key: StableKey): boolean => key === activeKey;
+	const isHovered = (key: StableKey): boolean => hoverKey === key;
 </script>
 
 <div class="treeWrap" class:isInteractive={isClickEnabled}>
@@ -140,11 +174,11 @@
 				e.stopPropagation();
 			}}
 		>
-			{#each nodeIds as id (id)}
-				{@const n = nodes[id]}
-				{#if n && n.parent !== null}
-					{@const p = positions[n.parent]}
-					{@const c = positions[id]}
+			{#each nodeKeys as key (key)}
+				{@const n = nodesByKey.get(key)}
+				{#if n && n.parentKey !== null}
+					{@const p = positions[n.parentKey]}
+					{@const c = positions[key]}
 					{#if p && c}
 						<line
 							x1={p.x}
@@ -159,54 +193,55 @@
 				{/if}
 			{/each}
 
-			{#each nodeIds as id (id)}
-				{@const pos = positions[id]}
-				{@const n = nodes[id]}
+			{#each nodeKeys as key (key)}
+				{@const pos = positions[key]}
+				{@const n = nodesByKey.get(key)}
 				{#if pos && n}
 					<g
 						transform={`translate(${pos.x} ${pos.y})`}
 						class="node"
-						class:root={isRoot(id)}
+						class:root={isRoot(key)}
 						class:swap={n.kind === "swap"}
-						class:real={isReal(id)}
-						class:active={isActive(id)}
-						class:hovered={isHovered(id)}
-						onpointerenter={() => (isHoverEnabled ? setHover(id) : undefined)}
+						class:shared={n.layer === "shared"}
+						class:real={isReal(key)}
+						class:active={isActive(key)}
+						class:hovered={isHovered(key)}
+						onpointerenter={() => (isHoverEnabled ? setHover(key) : undefined)}
 						onpointerdown={(e) => {
 							if (e.button !== 2) return;
 							e.preventDefault();
 							e.stopPropagation();
-							if (!canDelete(id)) return;
-							del(id);
+							if (!canDelete(key)) return;
+							del(key);
 						}}
 						role="button"
 						tabindex={isClickEnabled ? 0 : -1}
 						onclick={(e) => {
 							e.preventDefault();
 							if (!isClickEnabled) return;
-							select(id);
+							select(key);
 						}}
 						onkeydown={(e) => {
 							if (!isClickEnabled) return;
 							if (e.key !== "Enter" && e.key !== " ") return;
 							e.preventDefault();
-							select(id);
+							select(key);
 						}}
 						oncontextmenu={(e) => {
 							e.preventDefault();
-							if (!canDelete(id)) return;
-							del(id);
+							if (!canDelete(key)) return;
+							del(key);
 						}}
-						style:cursor={isClickEnabled || canDelete(id)
+						style:cursor={isClickEnabled || canDelete(key)
 							? "pointer"
 							: "default"}
 					>
 						<title>
 							{isClickEnabled
-								? canDelete(id)
+								? canDelete(key)
 									? "Hover: preview • Left click: jump • Right click: delete branch"
 									: "Hover: preview • Left click: jump"
-								: canDelete(id)
+								: canDelete(key)
 									? "Hover: preview • Right click: delete branch • Hold ctrl for preview mode"
 									: "Hover: preview • Hold ctrl for preview mode"}
 						</title>
@@ -214,16 +249,16 @@
 							cx="0"
 							cy="0"
 							{r}
-							fill={isRoot(id)
+							fill={isRoot(key)
 								? "rgba(0,0,0,0.16)"
-								: isOnRealPath(id)
+								: isOnRealPath(key)
 									? "rgba(0,0,0,0.06)"
 									: "rgba(255,255,255,0.92)"}
-							stroke={isReal(id) ? "black" : "rgba(0,0,0,0.25)"}
-							stroke-width={isReal(id) ? 2 : 1}
+							stroke={isReal(key) ? "black" : "rgba(0,0,0,0.25)"}
+							stroke-width={isReal(key) ? 2 : 1}
 							vector-effect="non-scaling-stroke"
 						></circle>
-						{#if isSaveShown && isActive(id)}
+						{#if isSaveShown && isActive(key)}
 							<g
 								class="saveBtn"
 								transform={`translate(${r + 8} ${-(r + 8)})`}
@@ -246,7 +281,7 @@
 									save();
 								}}
 							>
-								<title>Save preview changes</title>
+								<title>{saveTitle}</title>
 								<circle
 									cx="0"
 									cy="0"
@@ -263,7 +298,7 @@
 								/>
 							</g>
 						{/if}
-						{#if isActive(id) && !isReal(id)}
+						{#if isActive(key) && !isReal(key)}
 							<circle
 								cx="0"
 								cy="0"
@@ -274,7 +309,7 @@
 								vector-effect="non-scaling-stroke"
 							></circle>
 						{/if}
-						{#if isHovered(id)}
+						{#if isHovered(key)}
 							<circle
 								cx="0"
 								cy="0"
@@ -320,6 +355,11 @@
 
 	.node.swap circle:first-child {
 		stroke-dasharray: 3 2;
+	}
+
+	.node.shared circle:first-child {
+		stroke: rgba(30, 58, 138, 0.55);
+		fill: rgba(220, 233, 255, 0.58);
 	}
 
 	.saveBtn {

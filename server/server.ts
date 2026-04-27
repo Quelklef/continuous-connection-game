@@ -3,6 +3,7 @@ import type {
 	BoardColors,
 	ClientMessage,
 	ServerMessage,
+	SharedPreviewOp,
 } from "../shared/types.ts";
 import { Bad, ensureCoverage } from "../shared/lib.ts";
 import {
@@ -19,6 +20,41 @@ const connections: Record<number, WebSocket> = {};
 let id = 0;
 let boardSize: number | null = null;
 let boardColors: BoardColors | null = null;
+
+const isStableKey = (u: unknown): u is string =>
+	typeof u === "string" && u.trim().length > 0;
+
+const isSharedPreviewOp = (u: unknown): u is SharedPreviewOp => {
+	if (typeof u !== "object" || u === null) return false;
+	if (!("kind" in u)) return false;
+	const typed = u as { kind: unknown; [k: string]: unknown };
+	if (typeof typed.kind !== "string") return false;
+
+	const isSharedPreviewMove = (m: unknown): boolean => {
+		if (typeof m !== "object" || m === null) return false;
+		if (!("kind" in m)) return false;
+		const mk = (m as { kind: unknown }).kind;
+		if (mk === "swap") return true;
+		if (mk === "stone")
+			return "coords" in m && isMoveData((m as { coords: unknown }).coords);
+		return false;
+	};
+
+	switch (typed.kind) {
+		case "presence":
+			return typeof typed["active"] === "boolean";
+		case "add":
+			return (
+				isStableKey(typed["parentKey"]) &&
+				"move" in typed &&
+				isSharedPreviewMove(typed["move"])
+			);
+		case "delete":
+			return isStableKey(typed["rootKey"]);
+		default:
+			return false;
+	}
+};
 
 const parseWs = (data: string): ClientMessage | Bad => {
 	let ok: boolean;
@@ -62,6 +98,9 @@ const parseWs = (data: string): ClientMessage | Bad => {
 		case "undo":
 		case "swap":
 			return parsed as ClientMessage;
+		case "shared preview":
+			if (isSharedPreviewOp(typedMessage.data)) return parsed as ClientMessage;
+			else return new Bad("'shared preview' type has incorrect data");
 		default:
 			ensureCoverage(typedMessage.type);
 			return new Bad("ClientMessage.message.type is invalid");
@@ -95,6 +134,16 @@ wss.on("connection", (ws) => {
 		}
 
 		ws.on("close", () => {
+			const otherClients: WebSocket[] = Object.entries(connections)
+				.filter(([cid]) => cid !== wsId.toString())
+				.map((a) => a[1]);
+			otherClients.forEach((client) =>
+				send(client, {
+					type: "shared preview",
+					data: { senderId: wsId, op: { kind: "presence", active: false } },
+				}),
+			);
+
 			delete connections[wsId];
 			if (numConnections() === 0) {
 				boardSize = null;
@@ -135,6 +184,14 @@ wss.on("connection", (ws) => {
 						case "undo":
 						case "swap":
 							otherClients.forEach((client) => send(client, message));
+							break;
+						case "shared preview":
+							otherClients.forEach((client) =>
+								send(client, {
+									type: "shared preview",
+									data: { senderId: wsId, op: message.data },
+								}),
+							);
 							break;
 						default:
 							ensureCoverage(message);

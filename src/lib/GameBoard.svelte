@@ -5,6 +5,8 @@
 		InnerClientMessage,
 		MoveData,
 		Player,
+		SharedPreviewOp,
+		StableKey,
 	} from "../../shared/types.ts";
 	import {
 		isBoardColors,
@@ -17,6 +19,19 @@
 	} from "../../shared/validate.ts";
 	import HistoryTree from "$lib/HistoryTree.svelte";
 	import Toolbar from "$lib/Toolbar.svelte";
+	import {
+		appendKey,
+		keyDepth,
+		parentKeyOf,
+		rootKey,
+	} from "$lib/history/stableKey";
+	import {
+		emptyOverlayState,
+		overlayDeleteSubtree,
+		overlayGet,
+		overlaySubtreeKeys,
+		overlayUpsertAdd,
+	} from "$lib/sharedPreview/overlay";
 	type Props = {
 		size: number;
 		moves: MoveData[];
@@ -74,6 +89,11 @@
 	let hasReceivedServerColors = $state(false);
 	let isComponentOutlinesEnabled = $state(false);
 	let isPreviewMode = $state(false);
+	let isAltHeld = $state(false);
+
+	let sharedOverlay = $state(emptyOverlayState());
+	let sharedOverlayVersion = $state(0);
+	let sharedPreviewHoldersById = $state<Record<number, true>>({});
 
 	const playerFromIndex = (index: number): Player => {
 		return index % 2 === 0 ? 1 : 2;
@@ -92,13 +112,24 @@
 		children: NodeId[];
 	};
 
+	type BaselineSnapshot = {
+		size: number;
+		historyNodes: (HistoryNode | null)[];
+		historyRootId: NodeId;
+		historyNextId: NodeId;
+		realCursorId: NodeId;
+	};
+
+	let stagedBaseline: BaselineSnapshot | null = $state(null);
+	let hasStagedBaselineChanges = $state(false);
+
 	let historyNodes = $state<(HistoryNode | null)[]>([]);
 	let historyRootId = $state<NodeId>(0);
 	let historyNextId = $state<NodeId>(1);
 	let realCursorId = $state<NodeId>(0);
-	let activeCursorId = $state<NodeId>(0);
-	let hoverCursorId = $state<NodeId | null>(null);
-	let lastPreviewCursorId = $state<NodeId>(0);
+	let activeKey = $state<StableKey>(rootKey);
+	let hoverKey = $state<StableKey | null>(null);
+	let lastPreviewKey = $state<StableKey>(rootKey);
 
 	const nodeAt = (id: NodeId): HistoryNode => {
 		const n = historyNodes[id];
@@ -122,8 +153,9 @@
 		historyRootId = 0;
 		historyNextId = 1;
 		realCursorId = 0;
-		activeCursorId = 0;
-		hoverCursorId = null;
+		activeKey = rootKey;
+		hoverKey = null;
+		lastPreviewKey = rootKey;
 	};
 
 	resetHistory();
@@ -145,8 +177,8 @@
 		});
 		if (existing !== undefined) return existing;
 
-		if (isPreviewEnabled && stagedPreviewBaseline)
-			hasStagedPreviewChanges = true;
+		if (isPreviewEnabled && !isSharedPreviewEditEnabled)
+			hasStagedBaselineChanges = true;
 
 		const nextId = historyNextId;
 		historyNextId += 1;
@@ -181,8 +213,8 @@
 		});
 		if (existing !== undefined) return existing;
 
-		if (isPreviewEnabled && stagedPreviewBaseline)
-			hasStagedPreviewChanges = true;
+		if (isPreviewEnabled && !isSharedPreviewEditEnabled)
+			hasStagedBaselineChanges = true;
 
 		const nextId = historyNextId;
 		historyNextId += 1;
@@ -222,26 +254,120 @@
 		return out;
 	};
 
+	const baselineKeyById = $derived(
+		((): Record<number, StableKey> => {
+			const out: Record<number, StableKey> = {};
+			out[historyRootId] = rootKey;
+
+			const stack: NodeId[] = [historyRootId];
+			while (stack.length > 0) {
+				const id = stack.pop();
+				if (id === undefined) break;
+				const n = historyNodes[id];
+				if (!n) continue;
+				const parentKey = out[id];
+				if (!parentKey) continue;
+
+				for (const childId of n.children) {
+					const child = historyNodes[childId];
+					if (!child || !child.move) continue;
+					const key = appendKey(parentKey, child.move);
+					out[childId] = key;
+					stack.push(childId);
+				}
+			}
+
+			return out;
+		})(),
+	);
+
+	const baselineIdByKey = $derived(
+		((): Record<string, NodeId> => {
+			const out: Record<string, NodeId> = {};
+			for (const [idStr, key] of Object.entries(baselineKeyById))
+				out[key] = Number.parseInt(idStr, 10);
+			return out;
+		})(),
+	);
+
+	const realKey = $derived(baselineKeyById[realCursorId] ?? rootKey);
+
+	const moveForKey = (key: StableKey): HistoryMove | null => {
+		if (key === rootKey) return null;
+
+		const baselineId = baselineIdByKey[key];
+		if (baselineId !== undefined) return historyNodes[baselineId]?.move ?? null;
+
+		return overlayGet(sharedOverlay, key)?.move ?? null;
+	};
+
+	const stoneMovesAtKey = (key: StableKey): MoveData[] => {
+		let cur: StableKey = key;
+		const out: MoveData[] = [];
+		while (cur !== rootKey) {
+			const move = moveForKey(cur);
+			if (move?.kind === "stone") out.push(move.coords);
+			const parent = parentKeyOf(cur);
+			if (!parent) break;
+			cur = parent;
+		}
+		out.reverse();
+		return out;
+	};
+
+	const stonePlyAtKey = (key: StableKey): number => stoneMovesAtKey(key).length;
+
 	const setRealCursor = (next: NodeId): void => {
 		realCursorId = next;
 		if (playerMode === 1 || !isPreviewMode) {
-			activeCursorId = next;
-			hoverCursorId = null;
+			activeKey = baselineKeyById[next] ?? rootKey;
+			hoverKey = null;
 		}
 	};
 
-	const setActiveCursor = (next: NodeId): void => {
-		activeCursorId = next;
-		hoverCursorId = null;
+	const setActiveKey = (next: StableKey): void => {
+		activeKey = next;
+		hoverKey = null;
 	};
 
 	const realMoveCount = $derived(nodeAt(realCursorId).stonePly);
-	const activeMoveCount = $derived(nodeAt(activeCursorId).stonePly);
 	const isPreviewEnabled = $derived(playerMode !== 1 && isPreviewMode);
 	const isHistoryClickEnabled = $derived(playerMode === 1 || isPreviewEnabled);
-	const displayCursorId = $derived(hoverCursorId ?? activeCursorId);
-	const displayMoves = $derived(moveListAt(displayCursorId));
-	const displayMoveCount = $derived(nodeAt(displayCursorId).stonePly);
+	const isSharedPreviewEditEnabled = $derived(
+		isPreviewEnabled && isAltHeld && playerMode !== 1 && connected,
+	);
+	const isSharedOverlayVisible = $derived(
+		playerMode !== 1 &&
+			connected &&
+			(!isPreviewEnabled || isSharedPreviewEditEnabled),
+	);
+	const displayKey = $derived(hoverKey ?? activeKey);
+	const displayMoves = $derived(
+		(() => {
+			void sharedOverlayVersion;
+			return stoneMovesAtKey(displayKey);
+		})(),
+	);
+	const displayMoveCount = $derived(displayMoves.length);
+	const activeMoveCount = $derived(
+		(() => {
+			void sharedOverlayVersion;
+			return stonePlyAtKey(activeKey);
+		})(),
+	);
+	const realPathByKey = $derived(
+		(() => {
+			const out: Record<string, true> = {};
+			let cur: StableKey = realKey;
+			while (true) {
+				out[cur] = true;
+				const parent = parentKeyOf(cur);
+				if (parent === null) break;
+				cur = parent;
+			}
+			return out;
+		})(),
+	);
 	const realPathById = $derived(
 		(() => {
 			const out: Record<number, true> = {};
@@ -269,7 +395,7 @@
 	);
 	const isPreviewStoneShown = $derived(
 		mouseOver &&
-			hoverCursorId === null &&
+			hoverKey === null &&
 			(playerMode === 1 || isPreviewEnabled || (connected && myTurn)),
 	);
 
@@ -279,48 +405,52 @@
 
 	$effect(() => {
 		if (!isPreviewEnabled) return;
-		lastPreviewCursorId = activeCursorId;
+		lastPreviewKey = activeKey;
 	});
 
 	let wasPreviewEnabled = $state(false);
 	$effect(() => {
 		if (playerMode === 1) {
 			isPreviewMode = false;
-			lastPreviewCursorId = realCursorId;
-			activeCursorId = realCursorId;
-			hoverCursorId = null;
+			lastPreviewKey = realKey;
+			activeKey = realKey;
+			hoverKey = null;
 			wasPreviewEnabled = false;
-			stagedPreviewBaseline = null;
-			hasStagedPreviewChanges = false;
+			stagedBaseline = null;
+			hasStagedBaselineChanges = false;
 			return;
 		}
 
 		if (!isPreviewEnabled) {
 			if (wasPreviewEnabled) {
-				if (stagedPreviewBaseline && hasStagedPreviewChanges) {
-					const baseline = stagedPreviewBaseline;
+				if (stagedBaseline && hasStagedBaselineChanges) {
+					const baseline = stagedBaseline;
+					size = baseline.size;
 					historyNodes = baseline.historyNodes;
 					historyRootId = baseline.historyRootId;
 					historyNextId = baseline.historyNextId;
 					realCursorId = baseline.realCursorId;
-					activeCursorId = baseline.realCursorId;
-					lastPreviewCursorId = baseline.lastPreviewCursorId;
-					hoverCursorId = null;
+					hoverKey = null;
 				}
-				stagedPreviewBaseline = null;
-				hasStagedPreviewChanges = false;
+				stagedBaseline = null;
+				hasStagedBaselineChanges = false;
 			}
-			if (wasPreviewEnabled) lastPreviewCursorId = activeCursorId;
-			activeCursorId = realCursorId;
-			hoverCursorId = null;
+			if (wasPreviewEnabled) lastPreviewKey = activeKey;
+			activeKey = realKey;
+			hoverKey = null;
 		} else if (!wasPreviewEnabled) {
-			stagedPreviewBaseline = persistGameStateSnapshot();
-			hasStagedPreviewChanges = false;
+			stagedBaseline = {
+				size,
+				historyNodes,
+				historyRootId,
+				historyNextId,
+				realCursorId,
+			};
+			hasStagedBaselineChanges = false;
 
-			const candidate = historyNodes[lastPreviewCursorId]
-				? lastPreviewCursorId
-				: realCursorId;
-			setActiveCursor(candidate);
+			const candidate =
+				lastPreviewKey in baselineIdByKey ? lastPreviewKey : realKey;
+			setActiveKey(candidate);
 		}
 
 		wasPreviewEnabled = isPreviewEnabled;
@@ -328,7 +458,7 @@
 
 	const setPreviewMode = (next: boolean): void => {
 		if (playerMode === 1) return;
-		if (!next && isPreviewEnabled) lastPreviewCursorId = activeCursorId;
+		if (!next && isPreviewEnabled) lastPreviewKey = activeKey;
 		isPreviewMode = next;
 	};
 
@@ -615,14 +745,25 @@
 				if (isFormTarget) return;
 				setPreviewMode(true);
 			}
+			if (e.key === "Alt") {
+				const target = e.target;
+				const isFormTarget =
+					target instanceof HTMLInputElement ||
+					target instanceof HTMLTextAreaElement ||
+					target instanceof HTMLSelectElement;
+				if (isFormTarget) return;
+				isAltHeld = true;
+			}
 		};
 		const onKeyUp = (e: KeyboardEvent) => {
 			if (e.key === "Shift") isShiftHeld = false;
 			if (e.key === "Control") setPreviewMode(false);
+			if (e.key === "Alt") isAltHeld = false;
 		};
 		const onBlur = () => {
 			isShiftHeld = false;
 			setPreviewMode(false);
+			isAltHeld = false;
 		};
 		const onFocus = () => {
 			syncHover();
@@ -866,7 +1007,16 @@
 		return true;
 	};
 
-	type PersistedStateV1 = {
+	type PersistedStateV2 = {
+		v: 2;
+		size: number;
+		historyNodes: (HistoryNode | null)[];
+		historyRootId: NodeId;
+		historyNextId: NodeId;
+		realCursorId: NodeId;
+	};
+
+	type PersistedStateV1Legacy = {
 		v: 1;
 		size: number;
 		historyNodes: (HistoryNode | null)[];
@@ -876,9 +1026,6 @@
 		activeCursorId: NodeId;
 		lastPreviewCursorId: NodeId;
 	};
-
-	let stagedPreviewBaseline: PersistedStateV1 | null = $state(null);
-	let hasStagedPreviewChanges = $state(false);
 
 	let loadedPersistedStateKey: string | null = $state(null);
 	let hasSettledPersistedStateLoad = $state(false);
@@ -945,12 +1092,38 @@
 			hasSettledPersistedStateLoad = true;
 			return;
 		}
-		if (!("v" in parsed) || (parsed as PersistedStateV1).v !== 1) {
+		if (!("v" in parsed)) {
 			hasSettledPersistedStateLoad = true;
 			return;
 		}
 
-		const typed = parsed as PersistedStateV1;
+		const v = (parsed as { v: unknown }).v;
+		if (v !== 1 && v !== 2) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+
+		let typed: PersistedStateV2;
+		if (v === 2) {
+			typed = parsed as PersistedStateV2;
+		} else {
+			const legacy = parsed as PersistedStateV1Legacy;
+			if (
+				!isNodeId(legacy.activeCursorId) ||
+				!isNodeId(legacy.lastPreviewCursorId)
+			) {
+				hasSettledPersistedStateLoad = true;
+				return;
+			}
+			typed = {
+				v: 2,
+				size: legacy.size,
+				historyNodes: legacy.historyNodes,
+				historyRootId: legacy.historyRootId,
+				historyNextId: legacy.historyNextId,
+				realCursorId: legacy.realCursorId,
+			};
+		}
 		if (!isValidBoardSize(typed.size)) {
 			hasSettledPersistedStateLoad = true;
 			return;
@@ -968,14 +1141,6 @@
 			return;
 		}
 		if (!isNodeId(typed.realCursorId)) {
-			hasSettledPersistedStateLoad = true;
-			return;
-		}
-		if (!isNodeId(typed.activeCursorId)) {
-			hasSettledPersistedStateLoad = true;
-			return;
-		}
-		if (!isNodeId(typed.lastPreviewCursorId)) {
 			hasSettledPersistedStateLoad = true;
 			return;
 		}
@@ -1003,55 +1168,38 @@
 			hasSettledPersistedStateLoad = true;
 			return;
 		}
-		if (!hasNodeAt(typed.activeCursorId)) {
-			hasSettledPersistedStateLoad = true;
-			return;
-		}
-		if (!hasNodeAt(typed.lastPreviewCursorId)) {
-			hasSettledPersistedStateLoad = true;
-			return;
-		}
 
 		size = typed.size;
 		historyNodes = nodes;
 		historyRootId = typed.historyRootId;
 		historyNextId = typed.historyNextId;
 		realCursorId = typed.realCursorId;
-		activeCursorId = typed.activeCursorId;
-		lastPreviewCursorId = typed.lastPreviewCursorId;
-		hoverCursorId = null;
+		hoverKey = null;
+		lastPreviewKey = rootKey;
 
 		lastPersistedGameStateJson = raw;
 		hasSettledPersistedStateLoad = true;
 	});
 
-	const persistGameStateSnapshot = (): PersistedStateV1 => ({
-		v: 1,
+	const persistGameStateSnapshot = (): PersistedStateV2 => ({
+		v: 2,
 		size,
 		historyNodes:
-			isPreviewEnabled && stagedPreviewBaseline
-				? stagedPreviewBaseline.historyNodes
+			isPreviewEnabled && stagedBaseline
+				? stagedBaseline.historyNodes
 				: historyNodes,
 		historyRootId:
-			isPreviewEnabled && stagedPreviewBaseline
-				? stagedPreviewBaseline.historyRootId
+			isPreviewEnabled && stagedBaseline
+				? stagedBaseline.historyRootId
 				: historyRootId,
 		historyNextId:
-			isPreviewEnabled && stagedPreviewBaseline
-				? stagedPreviewBaseline.historyNextId
+			isPreviewEnabled && stagedBaseline
+				? stagedBaseline.historyNextId
 				: historyNextId,
 		realCursorId:
-			isPreviewEnabled && stagedPreviewBaseline
-				? stagedPreviewBaseline.realCursorId
+			isPreviewEnabled && stagedBaseline
+				? stagedBaseline.realCursorId
 				: realCursorId,
-		activeCursorId:
-			isPreviewEnabled && stagedPreviewBaseline
-				? stagedPreviewBaseline.activeCursorId
-				: activeCursorId,
-		lastPreviewCursorId:
-			isPreviewEnabled && stagedPreviewBaseline
-				? stagedPreviewBaseline.lastPreviewCursorId
-				: lastPreviewCursorId,
 	});
 
 	let persistGameStateTimer: number | null = $state(null);
@@ -1158,8 +1306,6 @@
 		void historyRootId;
 		void historyNextId;
 		void realCursorId;
-		void activeCursorId;
-		void lastPreviewCursorId;
 		schedulePersistedGameState();
 	});
 
@@ -1192,8 +1338,11 @@
 		resetHistory();
 		viewBox = { x: 0, y: 0, w: size, h: size };
 		isPreviewMode = false;
-		stagedPreviewBaseline = null;
-		hasStagedPreviewChanges = false;
+		stagedBaseline = null;
+		hasStagedBaselineChanges = false;
+		sharedOverlay = emptyOverlayState();
+		sharedOverlayVersion += 1;
+		sharedPreviewHoldersById = {};
 		lastPersistedGameStateJson = null;
 
 		if (typeof window === "undefined") return;
@@ -1210,24 +1359,75 @@
 		if (!ok) console.warn("failed to clear persisted game state", err);
 	};
 
-	const rawGameStateSnapshot = (): PersistedStateV1 => ({
-		v: 1,
+	const snapshotBaseline = (): BaselineSnapshot => ({
 		size,
 		historyNodes,
 		historyRootId,
 		historyNextId,
 		realCursorId,
-		activeCursorId,
-		lastPreviewCursorId,
 	});
 
-	const saveStagedPreviewChanges = (): void => {
+	const saveLocalStagedPreview = (): void => {
 		if (!isPreviewEnabled) return;
-		if (!stagedPreviewBaseline) return;
-		if (!hasStagedPreviewChanges) return;
+		if (!stagedBaseline) return;
+		if (!hasStagedBaselineChanges) return;
 
-		stagedPreviewBaseline = rawGameStateSnapshot();
-		hasStagedPreviewChanges = false;
+		stagedBaseline = snapshotBaseline();
+		hasStagedBaselineChanges = false;
+		flushPersistedGameState();
+	};
+
+	const overlaySubtreeRootedAt = (root: StableKey): StableKey[] => {
+		const out: StableKey[] = [];
+
+		if (overlayGet(sharedOverlay, root)) {
+			out.push(...overlaySubtreeKeys(sharedOverlay, root));
+			return out;
+		}
+
+		const roots = sharedOverlay.childrenByParentKey.get(root) ?? [];
+		for (const k of roots) out.push(...overlaySubtreeKeys(sharedOverlay, k));
+		return out;
+	};
+
+	const importSharedOverlaySubtree = (): void => {
+		const subtreeKeys = overlaySubtreeRootedAt(activeKey);
+		if (subtreeKeys.length === 0) return;
+
+		const idByKey: Record<string, NodeId> = { ...baselineIdByKey };
+		const toImport = subtreeKeys.toSorted(
+			(a, b) => keyDepth(a) - keyDepth(b) || a.localeCompare(b),
+		);
+
+		for (const key of toImport) {
+			if (key in idByKey) continue;
+			const node = overlayGet(sharedOverlay, key);
+			if (!node) continue;
+
+			const parentKey = node.parentKey;
+			const parentId = idByKey[parentKey];
+			if (parentId === undefined) continue;
+
+			switch (node.move.kind) {
+				case "stone":
+					idByKey[appendKey(parentKey, node.move)] = advanceFrom(
+						parentId,
+						node.move.coords,
+					);
+					break;
+				case "swap":
+					idByKey[appendKey(parentKey, node.move)] = advanceSwapFrom(parentId);
+					break;
+				default:
+					ensureCoverage(node.move);
+			}
+		}
+
+		if (isPreviewEnabled && stagedBaseline) {
+			stagedBaseline = snapshotBaseline();
+			hasStagedBaselineChanges = false;
+		}
+
 		flushPersistedGameState();
 	};
 
@@ -1276,6 +1476,57 @@
 		commitColors();
 	};
 
+	const isStableKey = (u: unknown): u is StableKey =>
+		typeof u === "string" && u.trim().length > 0;
+
+	const isSharedPreviewOp = (u: unknown): u is SharedPreviewOp => {
+		if (typeof u !== "object" || u === null) return false;
+		if (!("kind" in u)) return false;
+
+		const typed = u as { kind: unknown; [k: string]: unknown };
+		if (typeof typed.kind !== "string") return false;
+
+		const isSharedPreviewMove = (m: unknown): boolean => {
+			if (typeof m !== "object" || m === null) return false;
+			if (!("kind" in m)) return false;
+			const mk = (m as { kind: unknown }).kind;
+			if (mk === "swap") return true;
+			if (mk === "stone")
+				return "coords" in m && isMoveData((m as { coords: unknown }).coords);
+			return false;
+		};
+
+		switch (typed.kind) {
+			case "presence":
+				return typeof typed["active"] === "boolean";
+			case "add":
+				return (
+					isStableKey(typed["parentKey"]) &&
+					"move" in typed &&
+					isSharedPreviewMove(typed["move"])
+				);
+			case "delete":
+				return isStableKey(typed["rootKey"]);
+			default:
+				return false;
+		}
+	};
+
+	const isSharedPreviewServerData = (
+		u: unknown,
+	): u is { senderId: number; op: SharedPreviewOp } => {
+		if (typeof u !== "object" || u === null) return false;
+		if (!("senderId" in u) || !("op" in u)) return false;
+		const senderId = (u as { senderId: unknown }).senderId;
+		if (
+			!isFiniteNumber(senderId) ||
+			!Number.isInteger(senderId) ||
+			senderId < 0
+		)
+			return false;
+		return isSharedPreviewOp((u as { op: unknown }).op);
+	};
+
 	const parseWs = (data: string): ServerMessage | Bad => {
 		let ok: boolean;
 		let parsed: unknown;
@@ -1319,6 +1570,9 @@
 			case "undo":
 			case "swap":
 				return typed;
+			case "shared preview":
+				if (isSharedPreviewServerData(typed.data)) return typed;
+				else return new Bad("'shared preview' type has incorrect data");
 			default:
 				ensureCoverage(typed);
 				return new Bad("ServerMessage.type is invalid");
@@ -1329,6 +1583,26 @@
 		if (id !== null) ws.send(JSON.stringify({ id, message }));
 		else console.error("id is null");
 	};
+
+	let wasSharedPresenceActive = $state(false);
+	$effect(() => {
+		if (playerMode === 1) {
+			wasSharedPresenceActive = false;
+			return;
+		}
+		if (!connected) {
+			wasSharedPresenceActive = false;
+			return;
+		}
+
+		const now = isSharedPreviewEditEnabled;
+		if (now === wasSharedPresenceActive) return;
+		wasSharedPresenceActive = now;
+		send(playerMode.socket, {
+			type: "shared preview",
+			data: { kind: "presence", active: now },
+		});
+	});
 
 	let hasSentInitialSize = $state(false);
 	let hasSentInitialColors = $state(false);
@@ -1368,6 +1642,9 @@
 						case "set size":
 							size = msg.data;
 							resetHistory();
+							sharedOverlay = emptyOverlayState();
+							sharedOverlayVersion += 1;
+							sharedPreviewHoldersById = {};
 							break;
 						case "set colors":
 							hasReceivedServerColors = true;
@@ -1414,6 +1691,54 @@
 									setRealCursor(advanceSwapFrom(realCursorId));
 							}
 							break;
+						case "shared preview":
+							{
+								const { senderId, op } = msg.data;
+								switch (op.kind) {
+									case "presence":
+										{
+											const next = { ...sharedPreviewHoldersById };
+											if (op.active) next[senderId] = true;
+											else delete next[senderId];
+											sharedPreviewHoldersById = next;
+										}
+										break;
+									case "add":
+										{
+											const { changed } = overlayUpsertAdd(
+												sharedOverlay,
+												op.parentKey,
+												op.move,
+											);
+											if (changed) sharedOverlayVersion += 1;
+										}
+										break;
+									case "delete":
+										{
+											const subtree = overlaySubtreeKeys(
+												sharedOverlay,
+												op.rootKey,
+											);
+											const deletedSet = new Set(subtree);
+											const changed = overlayDeleteSubtree(
+												sharedOverlay,
+												op.rootKey,
+											);
+											if (!changed) break;
+
+											sharedOverlayVersion += 1;
+											if (hoverKey && deletedSet.has(hoverKey)) hoverKey = null;
+											if (deletedSet.has(activeKey)) {
+												const parent = parentKeyOf(op.rootKey) ?? rootKey;
+												setActiveKey(parent);
+											}
+										}
+										break;
+									default:
+										ensureCoverage(op);
+								}
+							}
+							break;
 						default:
 							ensureCoverage(msg);
 					}
@@ -1428,6 +1753,9 @@
 			assignedPlayer = null;
 			hasSentInitialSize = false;
 			hasSentInitialColors = false;
+			sharedOverlay = emptyOverlayState();
+			sharedOverlayVersion += 1;
+			sharedPreviewHoldersById = {};
 		};
 
 		ws.addEventListener("open", onOpen);
@@ -1448,9 +1776,9 @@
 	};
 
 	const undoActive = (): void => {
-		const cur = nodeAt(activeCursorId);
-		if (cur.parent === null) return;
-		setActiveCursor(cur.parent);
+		const parent = parentKeyOf(activeKey);
+		if (!parent) return;
+		setActiveKey(parent);
 	};
 
 	const swapReal = (): void => {
@@ -1583,7 +1911,7 @@
 		}
 
 		if (e.button === 0) {
-			if (hoverCursorId !== null) return;
+			if (hoverKey !== null) return;
 
 			if (playerMode === 1) {
 				setRealCursor(advanceFrom(realCursorId, mouseLoc));
@@ -1591,7 +1919,28 @@
 			}
 
 			if (isPreviewEnabled) {
-				setActiveCursor(advanceFrom(activeCursorId, mouseLoc));
+				if (isSharedPreviewEditEnabled && connected) {
+					const op: SharedPreviewOp = {
+						kind: "add",
+						parentKey: activeKey,
+						move: { kind: "stone", coords: mouseLoc },
+					};
+					const { key: nextKey, changed } = overlayUpsertAdd(
+						sharedOverlay,
+						op.parentKey,
+						op.move,
+					);
+					if (changed) {
+						sharedOverlayVersion += 1;
+						setActiveKey(nextKey);
+						send(playerMode.socket, { type: "shared preview", data: op });
+					}
+				} else {
+					const fromId = baselineIdByKey[activeKey] ?? realCursorId;
+					const nextId = advanceFrom(fromId, mouseLoc);
+					hasStagedBaselineChanges = true;
+					setActiveKey(baselineKeyById[nextId] ?? activeKey);
+				}
 				return;
 			}
 
@@ -1621,20 +1970,22 @@
 		viewBox = { x: 0, y: 0, w: size, h: size };
 	};
 
-	const setHoverCursor = (next: NodeId | null): void => {
-		hoverCursorId = next;
+	const setHoverCursor = (next: StableKey | null): void => {
+		hoverKey = next;
 	};
 
-	const selectHistoryNode = (next: NodeId): void => {
+	const selectHistoryNode = (next: StableKey): void => {
 		if (!isHistoryClickEnabled) return;
 
 		if (playerMode === 1) {
-			setRealCursor(next);
-			activeCursorId = next;
+			const id = baselineIdByKey[next];
+			if (id === undefined) return;
+			setRealCursor(id);
+			activeKey = next;
 			return;
 		}
 
-		if (isPreviewEnabled) setActiveCursor(next);
+		if (isPreviewEnabled) setActiveKey(next);
 	};
 
 	const subtreeIdsAt = (rootId: NodeId): NodeId[] => {
@@ -1664,11 +2015,49 @@
 		return !!historyNodes[id];
 	};
 
+	const canDeleteHistoryKey = (key: StableKey): boolean => {
+		if (key === rootKey) return false;
+		if (isSharedPreviewEditEnabled && overlayGet(sharedOverlay, key))
+			return true;
+
+		const id = baselineIdByKey[key];
+		if (id === undefined) return false;
+		return canDeleteHistoryNode(id);
+	};
+
+	const deleteHistoryKey = (key: StableKey): void => {
+		if (key === rootKey) return;
+
+		if (isSharedPreviewEditEnabled && overlayGet(sharedOverlay, key)) {
+			const subtree = overlaySubtreeKeys(sharedOverlay, key);
+			const deletedSet = new Set(subtree);
+			const changed = overlayDeleteSubtree(sharedOverlay, key);
+			if (!changed) return;
+
+			sharedOverlayVersion += 1;
+			if (connected && playerMode !== 1) {
+				const op: SharedPreviewOp = { kind: "delete", rootKey: key };
+				send(playerMode.socket, { type: "shared preview", data: op });
+			}
+
+			if (hoverKey && deletedSet.has(hoverKey)) hoverKey = null;
+			if (deletedSet.has(activeKey)) {
+				const parent = parentKeyOf(key) ?? rootKey;
+				setActiveKey(parent);
+			}
+			return;
+		}
+
+		const id = baselineIdByKey[key];
+		if (id === undefined) return;
+		deleteHistoryNode(id);
+	};
+
 	const deleteHistoryNode = (id: NodeId): void => {
 		if (!canDeleteHistoryNode(id)) return;
 
-		if (isPreviewEnabled && stagedPreviewBaseline)
-			hasStagedPreviewChanges = true;
+		if (isPreviewEnabled && !isSharedPreviewEditEnabled)
+			hasStagedBaselineChanges = true;
 
 		const n = nodeAt(id);
 		if (n.parent === null) return;
@@ -1686,9 +2075,87 @@
 		historyNodes = nextNodes;
 
 		const deleted = new Set(subtreeIds);
-		if (hoverCursorId !== null && deleted.has(hoverCursorId))
-			hoverCursorId = null;
-		if (deleted.has(activeCursorId)) activeCursorId = parentId;
+		const hoverId = hoverKey ? baselineIdByKey[hoverKey] : undefined;
+		if (hoverId !== undefined && deleted.has(hoverId)) hoverKey = null;
+
+		const activeId = baselineIdByKey[activeKey];
+		if (activeId !== undefined && deleted.has(activeId))
+			activeKey = baselineKeyById[parentId] ?? rootKey;
+	};
+
+	type RenderNode = {
+		key: StableKey;
+		parentKey: StableKey | null;
+		ply: number;
+		kind: "root" | "stone" | "swap";
+		layer: "baseline" | "shared";
+	};
+
+	const renderTreeNodes = $derived(
+		((): RenderNode[] => {
+			void sharedOverlayVersion;
+			const out: RenderNode[] = [];
+
+			for (let id = 0; id < historyNodes.length; id += 1) {
+				const n = historyNodes[id];
+				if (!n) continue;
+				const key = baselineKeyById[id];
+				if (!key) continue;
+
+				const parentKey =
+					n.parent === null ? null : (baselineKeyById[n.parent] ?? rootKey);
+
+				out.push({
+					key,
+					parentKey,
+					ply: n.ply,
+					kind: n.kind,
+					layer: "baseline",
+				});
+			}
+
+			if (isSharedOverlayVisible) {
+				for (const n of sharedOverlay.nodesByKey.values()) {
+					out.push({
+						key: n.key,
+						parentKey: n.parentKey,
+						ply: keyDepth(n.key),
+						kind: n.kind,
+						layer: "shared",
+					});
+				}
+			}
+
+			return out;
+		})(),
+	);
+
+	const sharedPreviewHolderCount = $derived(
+		Object.keys(sharedPreviewHoldersById).length,
+	);
+
+	const isSharedPreviewLive = $derived(
+		sharedPreviewHolderCount > 0 || isSharedPreviewEditEnabled,
+	);
+
+	const isSaveShown = $derived(
+		(() => {
+			void sharedOverlayVersion;
+			if (isPreviewEnabled && hasStagedBaselineChanges) return true;
+			if (!isSharedOverlayVisible) return false;
+			return overlaySubtreeRootedAt(activeKey).length > 0;
+		})(),
+	);
+
+	const saveTitle = $derived(
+		isPreviewEnabled && hasStagedBaselineChanges
+			? "Save preview changes"
+			: "Save shared preview subtree",
+	);
+
+	const save = (): void => {
+		if (isPreviewEnabled && hasStagedBaselineChanges) saveLocalStagedPreview();
+		else importSharedOverlaySubtree();
 	};
 </script>
 
@@ -1977,27 +2444,46 @@
 		>
 			<div class="historyHeader">
 				<div>game tree</div>
-				{#if playerMode !== 1 && isPreviewEnabled}
-					<div class="ctrlHeld" title="Preview mode (holding ctrl)">
-						CTRL HELD
-					</div>
-				{/if}
+				<div class="historyHeaderRight">
+					{#if playerMode !== 1 && isSharedPreviewEditEnabled}
+						<div
+							class="ctrlAltHeld"
+							title="Shared preview (holding ctrl+alt) • your preview edits are sent"
+						>
+							CTRL+ALT
+						</div>
+					{:else if playerMode !== 1 && isSharedOverlayVisible && isSharedPreviewLive}
+						<div
+							class="sharedLive"
+							title="Shared preview overlay (live) • hold ctrl to hide"
+						>
+							SHARED{sharedPreviewHolderCount > 0
+								? ` (${sharedPreviewHolderCount})`
+								: ""}
+						</div>
+					{:else if playerMode !== 1 && isPreviewEnabled}
+						<div class="ctrlHeld" title="Preview mode (holding ctrl)">
+							CTRL HELD
+						</div>
+					{/if}
+				</div>
 			</div>
 			<HistoryTree
-				nodes={historyNodes}
-				rootId={historyRootId}
-				{realCursorId}
-				{realPathById}
-				{activeCursorId}
-				{hoverCursorId}
+				nodes={renderTreeNodes}
+				{rootKey}
+				{realKey}
+				{realPathByKey}
+				{activeKey}
+				{hoverKey}
 				isHoverEnabled={true}
 				isClickEnabled={isHistoryClickEnabled}
-				isSaveShown={isPreviewEnabled && hasStagedPreviewChanges}
-				save={saveStagedPreviewChanges}
+				{isSaveShown}
+				{saveTitle}
+				{save}
 				setHover={setHoverCursor}
 				select={selectHistoryNode}
-				canDelete={canDeleteHistoryNode}
-				del={deleteHistoryNode}
+				canDelete={canDeleteHistoryKey}
+				del={deleteHistoryKey}
 			/>
 			<div class="historyNote">
 				hover: preview • click: jump • right click: delete branch
@@ -2124,6 +2610,12 @@
 		margin-bottom: 6px;
 	}
 
+	.historyHeaderRight {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+	}
+
 	.ctrlHeld {
 		padding: 3px 8px;
 		border-radius: 999px;
@@ -2148,6 +2640,33 @@
 			transform: translateY(-1px);
 			filter: saturate(1.25);
 		}
+	}
+
+	.ctrlAltHeld {
+		padding: 3px 10px;
+		border-radius: 999px;
+		font-size: 12px;
+		font-weight: 800;
+		letter-spacing: 0.4px;
+		background: rgba(190, 24, 93, 0.94);
+		color: white;
+		box-shadow:
+			0 10px 24px rgba(0, 0, 0, 0.2),
+			0 0 0 2px rgba(255, 255, 255, 0.7) inset;
+		animation: ctrlHeldPulse 1.05s ease-in-out infinite;
+	}
+
+	.sharedLive {
+		padding: 3px 10px;
+		border-radius: 999px;
+		font-size: 12px;
+		font-weight: 750;
+		letter-spacing: 0.3px;
+		background: rgba(15, 118, 110, 0.92);
+		color: white;
+		box-shadow:
+			0 10px 24px rgba(0, 0, 0, 0.18),
+			0 0 0 2px rgba(255, 255, 255, 0.65) inset;
 	}
 
 	.historyNote {

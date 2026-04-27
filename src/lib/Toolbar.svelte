@@ -517,6 +517,8 @@
 				{#if isMultiplayerEnabled}
 					<div class="keycap">ctrl</div>
 					<div>preview history</div>
+					<div class="keycap">ctrl+alt</div>
+					<div>shared preview (send/receive)</div>
 				{/if}
 			</div>
 		</div>
