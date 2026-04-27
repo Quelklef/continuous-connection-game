@@ -17,6 +17,8 @@
 		hoverCursorId: NodeId | null;
 		isHoverEnabled: boolean;
 		isClickEnabled: boolean;
+		isSaveShown: boolean;
+		save: () => void;
 
 		setHover: (id: NodeId | null) => void;
 		select: (id: NodeId) => void;
@@ -33,6 +35,8 @@
 		hoverCursorId,
 		isHoverEnabled,
 		isClickEnabled,
+		isSaveShown,
+		save,
 		setHover,
 		select,
 		canDelete,
@@ -193,7 +197,9 @@
 							if (!canDelete(id)) return;
 							del(id);
 						}}
-						style:cursor={isClickEnabled || canDelete(id) ? "pointer" : "default"}
+						style:cursor={isClickEnabled || canDelete(id)
+							? "pointer"
+							: "default"}
 					>
 						<title>
 							{isClickEnabled
@@ -217,6 +223,46 @@
 							stroke-width={isReal(id) ? 2 : 1}
 							vector-effect="non-scaling-stroke"
 						></circle>
+						{#if isSaveShown && isActive(id)}
+							<g
+								class="saveBtn"
+								transform={`translate(${r + 8} ${-(r + 8)})`}
+								role="button"
+								tabindex={0}
+								onpointerdown={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									save();
+								}}
+								onclick={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									save();
+								}}
+								onkeydown={(e) => {
+									if (e.key !== "Enter" && e.key !== " ") return;
+									e.preventDefault();
+									e.stopPropagation();
+									save();
+								}}
+							>
+								<title>Save preview changes</title>
+								<circle
+									cx="0"
+									cy="0"
+									r="7"
+									fill="rgba(30,58,138,0.95)"
+									stroke="rgba(255,255,255,0.7)"
+									stroke-width="1.5"
+									vector-effect="non-scaling-stroke"
+								></circle>
+								<path
+									d="M-3.2-3.4h6.4l1.6 1.7V4.2c0 .7-.6 1.3-1.3 1.3h-7.4c-.7 0-1.3-.6-1.3-1.3v-6.3c0-.7.6-1.3 1.3-1.3Zm.4 1.6v2h4.4v-2h-4.4Zm0 3.3v2h4.4v-2h-4.4Z"
+									fill="white"
+									opacity="0.95"
+								/>
+							</g>
+						{/if}
 						{#if isActive(id) && !isReal(id)}
 							<circle
 								cx="0"
@@ -274,6 +320,14 @@
 
 	.node.swap circle:first-child {
 		stroke-dasharray: 3 2;
+	}
+
+	.saveBtn {
+		cursor: pointer;
+	}
+
+	.saveBtn:hover {
+		transform: translateY(-1px);
 	}
 
 	.treeWrap:not(.isInteractive) {

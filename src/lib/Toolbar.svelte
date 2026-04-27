@@ -389,7 +389,11 @@
 						switch
 					</button>
 				{/if}
-				<button class="btn btnDanger" title="Reset to a new game" onclick={newGame}>
+				<button
+					class="btn btnDanger"
+					title="Reset to a new game"
+					onclick={newGame}
+				>
 					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
 						<path
 							d="M7 6h10l-1 14H8L7 6Zm2-2h6l1 2H8l1-2Z"

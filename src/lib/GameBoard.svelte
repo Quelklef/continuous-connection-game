@@ -145,6 +145,9 @@
 		});
 		if (existing !== undefined) return existing;
 
+		if (isPreviewEnabled && stagedPreviewBaseline)
+			hasStagedPreviewChanges = true;
+
 		const nextId = historyNextId;
 		historyNextId += 1;
 		const next: HistoryNode = {
@@ -177,6 +180,9 @@
 			return child.move?.kind === "swap";
 		});
 		if (existing !== undefined) return existing;
+
+		if (isPreviewEnabled && stagedPreviewBaseline)
+			hasStagedPreviewChanges = true;
 
 		const nextId = historyNextId;
 		historyNextId += 1;
@@ -284,14 +290,33 @@
 			activeCursorId = realCursorId;
 			hoverCursorId = null;
 			wasPreviewEnabled = false;
+			stagedPreviewBaseline = null;
+			hasStagedPreviewChanges = false;
 			return;
 		}
 
 		if (!isPreviewEnabled) {
+			if (wasPreviewEnabled) {
+				if (stagedPreviewBaseline && hasStagedPreviewChanges) {
+					const baseline = stagedPreviewBaseline;
+					historyNodes = baseline.historyNodes;
+					historyRootId = baseline.historyRootId;
+					historyNextId = baseline.historyNextId;
+					realCursorId = baseline.realCursorId;
+					activeCursorId = baseline.realCursorId;
+					lastPreviewCursorId = baseline.lastPreviewCursorId;
+					hoverCursorId = null;
+				}
+				stagedPreviewBaseline = null;
+				hasStagedPreviewChanges = false;
+			}
 			if (wasPreviewEnabled) lastPreviewCursorId = activeCursorId;
 			activeCursorId = realCursorId;
 			hoverCursorId = null;
 		} else if (!wasPreviewEnabled) {
+			stagedPreviewBaseline = persistGameStateSnapshot();
+			hasStagedPreviewChanges = false;
+
 			const candidate = historyNodes[lastPreviewCursorId]
 				? lastPreviewCursorId
 				: realCursorId;
@@ -668,7 +693,8 @@
 		const hPx = Math.round(rect.height * dpr);
 
 		const style = window.getComputedStyle(svg);
-		const borderPx = Math.max(0, Number.parseFloat(style.borderTopWidth) || 0) * dpr;
+		const borderPx =
+			Math.max(0, Number.parseFloat(style.borderTopWidth) || 0) * dpr;
 
 		const canvas = document.createElement("canvas");
 		canvas.width = wPx;
@@ -685,7 +711,14 @@
 		ctx.fillStyle = bg;
 		ctx.fillRect(0, 0, wPx, hPx);
 
-		const radial = ctx.createRadialGradient(wPx * 0.2, hPx * 0.18, 0, wPx * 0.2, hPx * 0.18, Math.max(wPx, hPx) * 0.7);
+		const radial = ctx.createRadialGradient(
+			wPx * 0.2,
+			hPx * 0.18,
+			0,
+			wPx * 0.2,
+			hPx * 0.18,
+			Math.max(wPx, hPx) * 0.7,
+		);
 		radial.addColorStop(0, "rgba(255,255,255,0.75)");
 		radial.addColorStop(0.6, "rgba(255,255,255,0)");
 		ctx.fillStyle = radial;
@@ -707,7 +740,9 @@
 		const svgText = rawSvg.includes('xmlns="http://www.w3.org/2000/svg"')
 			? rawSvg
 			: rawSvg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
-		const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+		const svgBlob = new Blob([svgText], {
+			type: "image/svg+xml;charset=utf-8",
+		});
 		const url = URL.createObjectURL(svgBlob);
 
 		let ok: boolean;
@@ -841,6 +876,9 @@
 		activeCursorId: NodeId;
 		lastPreviewCursorId: NodeId;
 	};
+
+	let stagedPreviewBaseline: PersistedStateV1 | null = $state(null);
+	let hasStagedPreviewChanges = $state(false);
 
 	let loadedPersistedStateKey: string | null = $state(null);
 	let hasSettledPersistedStateLoad = $state(false);
@@ -990,12 +1028,30 @@
 	const persistGameStateSnapshot = (): PersistedStateV1 => ({
 		v: 1,
 		size,
-		historyNodes,
-		historyRootId,
-		historyNextId,
-		realCursorId,
-		activeCursorId,
-		lastPreviewCursorId,
+		historyNodes:
+			isPreviewEnabled && stagedPreviewBaseline
+				? stagedPreviewBaseline.historyNodes
+				: historyNodes,
+		historyRootId:
+			isPreviewEnabled && stagedPreviewBaseline
+				? stagedPreviewBaseline.historyRootId
+				: historyRootId,
+		historyNextId:
+			isPreviewEnabled && stagedPreviewBaseline
+				? stagedPreviewBaseline.historyNextId
+				: historyNextId,
+		realCursorId:
+			isPreviewEnabled && stagedPreviewBaseline
+				? stagedPreviewBaseline.realCursorId
+				: realCursorId,
+		activeCursorId:
+			isPreviewEnabled && stagedPreviewBaseline
+				? stagedPreviewBaseline.activeCursorId
+				: activeCursorId,
+		lastPreviewCursorId:
+			isPreviewEnabled && stagedPreviewBaseline
+				? stagedPreviewBaseline.lastPreviewCursorId
+				: lastPreviewCursorId,
 	});
 
 	let persistGameStateTimer: number | null = $state(null);
@@ -1008,12 +1064,10 @@
 			persistGameStateTimer = null;
 		}
 
-		if (
-			persistGameStateIdleHandle !== null &&
-			"cancelIdleCallback" in window
-		) {
-			(window as unknown as { cancelIdleCallback: (h: number) => void })
-				.cancelIdleCallback(persistGameStateIdleHandle);
+		if (persistGameStateIdleHandle !== null && "cancelIdleCallback" in window) {
+			(
+				window as unknown as { cancelIdleCallback: (h: number) => void }
+			).cancelIdleCallback(persistGameStateIdleHandle);
 			persistGameStateIdleHandle = null;
 		}
 	};
@@ -1138,6 +1192,8 @@
 		resetHistory();
 		viewBox = { x: 0, y: 0, w: size, h: size };
 		isPreviewMode = false;
+		stagedPreviewBaseline = null;
+		hasStagedPreviewChanges = false;
 		lastPersistedGameStateJson = null;
 
 		if (typeof window === "undefined") return;
@@ -1152,6 +1208,27 @@
 			ok = false;
 		}
 		if (!ok) console.warn("failed to clear persisted game state", err);
+	};
+
+	const rawGameStateSnapshot = (): PersistedStateV1 => ({
+		v: 1,
+		size,
+		historyNodes,
+		historyRootId,
+		historyNextId,
+		realCursorId,
+		activeCursorId,
+		lastPreviewCursorId,
+	});
+
+	const saveStagedPreviewChanges = (): void => {
+		if (!isPreviewEnabled) return;
+		if (!stagedPreviewBaseline) return;
+		if (!hasStagedPreviewChanges) return;
+
+		stagedPreviewBaseline = rawGameStateSnapshot();
+		hasStagedPreviewChanges = false;
+		flushPersistedGameState();
 	};
 
 	$effect(() => {
@@ -1590,6 +1667,9 @@
 	const deleteHistoryNode = (id: NodeId): void => {
 		if (!canDeleteHistoryNode(id)) return;
 
+		if (isPreviewEnabled && stagedPreviewBaseline)
+			hasStagedPreviewChanges = true;
+
 		const n = nodeAt(id);
 		if (n.parent === null) return;
 		const parentId = n.parent;
@@ -1703,12 +1783,7 @@
 				{/if}
 
 				{#each movesForStones as move (move.i)}
-					{@render shape(
-						move.coords,
-						move.i,
-						false,
-						1,
-					)}
+					{@render shape(move.coords, move.i, false, 1)}
 				{/each}
 
 				{#if isShiftHeld && displayMoveCount > 0 && svgPixels && svgPixels.w > 0}
@@ -1837,7 +1912,7 @@
 				{boardShotCopyState}
 				{turnText}
 				{turnColor}
-				turnTextColor={turnTextColor}
+				{turnTextColor}
 				{size}
 				movesPlayed={realMoveCount}
 				{minBoardSize}
@@ -1903,7 +1978,9 @@
 			<div class="historyHeader">
 				<div>game tree</div>
 				{#if playerMode !== 1 && isPreviewEnabled}
-					<div class="ctrlHeld" title="Preview mode (holding ctrl)">CTRL HELD</div>
+					<div class="ctrlHeld" title="Preview mode (holding ctrl)">
+						CTRL HELD
+					</div>
 				{/if}
 			</div>
 			<HistoryTree
@@ -1915,6 +1992,8 @@
 				{hoverCursorId}
 				isHoverEnabled={true}
 				isClickEnabled={isHistoryClickEnabled}
+				isSaveShown={isPreviewEnabled && hasStagedPreviewChanges}
+				save={saveStagedPreviewChanges}
 				setHover={setHoverCursor}
 				select={selectHistoryNode}
 				canDelete={canDeleteHistoryNode}
