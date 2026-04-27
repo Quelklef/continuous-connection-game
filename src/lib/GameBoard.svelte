@@ -1297,9 +1297,16 @@
 				}}
 			/>
 		</div>
-		<div class="historyPanel" onpointerleave={() => setHoverCursor(null)}>
+		<div
+			class="historyPanel"
+			class:preview={isPreviewEnabled}
+			onpointerleave={() => setHoverCursor(null)}
+		>
 			<div class="historyHeader">
-				<div></div>
+				<div>game tree</div>
+				{#if playerMode !== 1 && isPreviewEnabled}
+					<div class="ctrlHeld" title="Preview mode (holding ctrl)">CTRL HELD</div>
+				{/if}
 			</div>
 			<HistoryTree
 				nodes={historyNodes}
@@ -1425,12 +1432,45 @@
 		box-sizing: border-box;
 	}
 
+	.historyPanel.preview {
+		border-color: rgba(30, 58, 138, 0.35);
+		box-shadow:
+			0 14px 36px rgba(0, 0, 0, 0.12),
+			0 0 0 4px rgba(30, 58, 138, 0.14);
+	}
+
 	.historyHeader {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
 		gap: 8px;
 		margin-bottom: 6px;
+	}
+
+	.ctrlHeld {
+		padding: 3px 8px;
+		border-radius: 999px;
+		font-size: 12px;
+		font-weight: 700;
+		letter-spacing: 0.4px;
+		background: rgba(30, 58, 138, 0.94);
+		color: white;
+		box-shadow:
+			0 10px 24px rgba(0, 0, 0, 0.2),
+			0 0 0 2px rgba(255, 255, 255, 0.7) inset;
+		animation: ctrlHeldPulse 1.15s ease-in-out infinite;
+	}
+
+	@keyframes ctrlHeldPulse {
+		0%,
+		100% {
+			transform: translateY(0);
+			filter: saturate(1);
+		}
+		50% {
+			transform: translateY(-1px);
+			filter: saturate(1.25);
+		}
 	}
 
 	.historyNote {
