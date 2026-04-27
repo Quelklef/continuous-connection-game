@@ -978,7 +978,6 @@
 	};
 
 	const canDeleteHistoryNode = (id: NodeId): boolean => {
-		if (!isHistoryClickEnabled) return false;
 		if (id === historyRootId) return false;
 		if (subtreeHasReal(id)) return false;
 		return !!historyNodes[id];

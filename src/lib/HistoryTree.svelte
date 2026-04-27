@@ -170,11 +170,6 @@
 							if (e.button !== 2) return;
 							e.preventDefault();
 							e.stopPropagation();
-							if (!isClickEnabled) return;
-							if (e.ctrlKey) {
-								select(id);
-								return;
-							}
 							if (!canDelete(id)) return;
 							del(id);
 						}}
@@ -193,22 +188,19 @@
 						}}
 						oncontextmenu={(e) => {
 							e.preventDefault();
-							if (!isClickEnabled) return;
-							if (e.ctrlKey) {
-								select(id);
-								return;
-							}
 							if (!canDelete(id)) return;
 							del(id);
 						}}
-						style:cursor={isClickEnabled ? "pointer" : "default"}
+						style:cursor={isClickEnabled || canDelete(id) ? "pointer" : "default"}
 					>
 						<title>
 							{isClickEnabled
 								? canDelete(id)
 									? "Hover: preview • Left click: jump • Right click: delete branch"
 									: "Hover: preview • Left click: jump"
-								: "Hover: preview • Hold ctrl for preview mode"}
+								: canDelete(id)
+									? "Hover: preview • Right click: delete branch • Hold ctrl for preview mode"
+									: "Hover: preview • Hold ctrl for preview mode"}
 						</title>
 						<circle
 							cx="0"
