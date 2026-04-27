@@ -1030,7 +1030,6 @@
 		!isZoomedIn || isButtingBottom ? player1Color : "black",
 	);
 
-	let latestMoveIndex = $derived(displayMoveCount - 1);
 	let isZoomAtOneX = $derived(
 		Math.abs(viewBox.w - size) < 1e-6 && Math.abs(viewBox.h - size) < 1e-6,
 	);
@@ -1319,7 +1318,7 @@
 						fill={playerColor(playerFromIndex(index))}
 						fill-opacity={opacity}
 						stroke={isHighlighted ? "black" : "none"}
-						stroke-width={isHighlighted ? 4 : 0}
+						stroke-width={isHighlighted ? 2 : 0}
 						vector-effect="non-scaling-stroke"
 					></rect>
 				{/snippet}
@@ -1332,10 +1331,27 @@
 					{@render shape(
 						move.coords,
 						move.i,
-						isShiftHeld && move.i === latestMoveIndex,
+						false,
 						1,
 					)}
 				{/each}
+
+				{#if isShiftHeld && displayMoveCount > 0}
+					{@const latestCoords = displayMoves[displayMoveCount - 1]}
+					{#if latestCoords}
+						<rect
+							x={latestCoords[0] - 1 / 2}
+							y={latestCoords[1] - 1 / 2}
+							width="1"
+							height="1"
+							fill="none"
+							stroke="black"
+							stroke-width="2"
+							vector-effect="non-scaling-stroke"
+							style:pointer-events="none"
+						></rect>
+					{/if}
+				{/if}
 
 				{#if isComponentOutlinesEnabled}
 					<defs>
