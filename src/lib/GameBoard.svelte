@@ -491,6 +491,32 @@
 		};
 
 		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "z" && e.ctrlKey) {
+				const target = e.target;
+				const isFormTarget =
+					target instanceof HTMLInputElement ||
+					target instanceof HTMLTextAreaElement ||
+					target instanceof HTMLSelectElement;
+				if (isFormTarget) return;
+
+				e.preventDefault();
+				if (playerMode === 1) {
+					undoReal();
+					return;
+				}
+
+				if (isPreviewEnabled) {
+					undoActive();
+					return;
+				}
+
+				if (connected) {
+					undoReal();
+					send(playerMode.socket, { type: "undo" });
+				}
+				return;
+			}
+
 			if (e.key === "Shift") isShiftHeld = true;
 			if (e.key === "Control") {
 				const target = e.target;
