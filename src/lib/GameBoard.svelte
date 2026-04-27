@@ -61,8 +61,7 @@
 	let mouseOver = $state(false);
 	let connected = $state(false);
 	let id: number | null = null;
-	let player: Player | null = $state(null);
-	let swapped: boolean = $state(false);
+	let assignedPlayer: Player | null = $state(null);
 	let svg: SVGSVGElement;
 	let lastClientCoords: [number, number] | null = $state(null);
 	const defaultPlayer1Color = "#e23d4f";
@@ -81,11 +80,15 @@
 	};
 
 	type NodeId = number;
+	type HistoryMove = { kind: "stone"; coords: MoveData } | { kind: "swap" };
 	type HistoryNode = {
 		id: NodeId;
 		parent: NodeId | null;
-		move: MoveData | null;
+		move: HistoryMove | null;
+		kind: "root" | "stone" | "swap";
 		ply: number;
+		stonePly: number;
+		playersSwapped: boolean;
 		children: NodeId[];
 	};
 
@@ -108,7 +111,10 @@
 			id: 0,
 			parent: null,
 			move: null,
+			kind: "root",
 			ply: 0,
+			stonePly: 0,
+			playersSwapped: false,
 			children: [],
 		};
 		historyNodes = [];
@@ -134,8 +140,8 @@
 		const from = nodeAt(fromId);
 		const existing = from.children.find((childId) => {
 			const child = nodeAt(childId);
-			if (!child.move) return false;
-			return isSameMove(child.move, move);
+			if (child.move?.kind !== "stone") return false;
+			return isSameMove(child.move.coords, move);
 		});
 		if (existing !== undefined) return existing;
 
@@ -144,8 +150,44 @@
 		const next: HistoryNode = {
 			id: nextId,
 			parent: fromId,
-			move,
+			move: { kind: "stone", coords: move },
+			kind: "stone",
 			ply: from.ply + 1,
+			stonePly: from.stonePly + 1,
+			playersSwapped: from.playersSwapped,
+			children: [],
+		};
+
+		const updatedFrom: HistoryNode = {
+			...from,
+			children: [...from.children, nextId],
+		};
+
+		const nextNodes = historyNodes.slice();
+		nextNodes[nextId] = next;
+		nextNodes[fromId] = updatedFrom;
+		historyNodes = nextNodes;
+		return nextId;
+	};
+
+	const advanceSwapFrom = (fromId: NodeId): NodeId => {
+		const from = nodeAt(fromId);
+		const existing = from.children.find((childId) => {
+			const child = nodeAt(childId);
+			return child.move?.kind === "swap";
+		});
+		if (existing !== undefined) return existing;
+
+		const nextId = historyNextId;
+		historyNextId += 1;
+		const next: HistoryNode = {
+			id: nextId,
+			parent: fromId,
+			move: { kind: "swap" },
+			kind: "swap",
+			ply: from.ply + 1,
+			stonePly: from.stonePly,
+			playersSwapped: true,
 			children: [],
 		};
 
@@ -166,7 +208,7 @@
 		const out: MoveData[] = [];
 		while (cur !== historyRootId) {
 			const n = nodeAt(cur);
-			if (n.move) out.push(n.move);
+			if (n.move?.kind === "stone") out.push(n.move.coords);
 			if (n.parent === null) break;
 			cur = n.parent;
 		}
@@ -187,13 +229,13 @@
 		hoverCursorId = null;
 	};
 
-	const realMoveCount = $derived(nodeAt(realCursorId).ply);
-	const activeMoveCount = $derived(nodeAt(activeCursorId).ply);
+	const realMoveCount = $derived(nodeAt(realCursorId).stonePly);
+	const activeMoveCount = $derived(nodeAt(activeCursorId).stonePly);
 	const isPreviewEnabled = $derived(playerMode !== 1 && isPreviewMode);
 	const isHistoryClickEnabled = $derived(playerMode === 1 || isPreviewEnabled);
 	const displayCursorId = $derived(hoverCursorId ?? activeCursorId);
 	const displayMoves = $derived(moveListAt(displayCursorId));
-	const displayMoveCount = $derived(nodeAt(displayCursorId).ply);
+	const displayMoveCount = $derived(nodeAt(displayCursorId).stonePly);
 	const realPathById = $derived(
 		(() => {
 			const out: Record<number, true> = {};
@@ -207,8 +249,17 @@
 			return out;
 		})(),
 	);
+	const effectivePlayer = $derived(
+		(() => {
+			if (assignedPlayer === null) return null;
+			const swapped = nodeAt(realCursorId).playersSwapped;
+			return swapped ? (assignedPlayer === 1 ? 2 : 1) : assignedPlayer;
+		})(),
+	);
 	let myTurn = $derived(
-		playerMode === 1 || playerFromIndex(realMoveCount) === player,
+		playerMode === 1 ||
+			(effectivePlayer !== null &&
+				playerFromIndex(realMoveCount) === effectivePlayer),
 	);
 	const isPreviewStoneShown = $derived(
 		mouseOver &&
@@ -335,7 +386,7 @@
 	let turnText = $derived(
 		(() => {
 			if (playerMode === 1) return `Turn: P${turnPlayer}`;
-			if (player === null) return "Turn: —";
+			if (effectivePlayer === null) return "Turn: —";
 			return myTurn ? "Turn: YOURS" : "Turn: THEIRS";
 		})(),
 	);
@@ -425,7 +476,6 @@
 
 		size = clamped;
 		resetHistory();
-		swapped = false;
 		if (playerMode !== 1 && connected)
 			send(playerMode.socket, { type: "set size", data: size });
 	};
@@ -866,7 +916,6 @@
 						case "set size":
 							size = msg.data;
 							resetHistory();
-							swapped = false;
 							break;
 						case "set colors":
 							hasReceivedServerColors = true;
@@ -898,17 +947,20 @@
 							}
 							break;
 						case "assign player":
-							player = msg.data;
+							assignedPlayer = msg.data;
 							break;
 						case "undo":
 							{
 								const parent = nodeAt(realCursorId).parent;
 								if (parent !== null) setRealCursor(parent);
 							}
-							swapped = false;
 							break;
 						case "swap":
-							swap();
+							{
+								const cur = nodeAt(realCursorId);
+								if (cur.stonePly === 1 && !cur.playersSwapped)
+									setRealCursor(advanceSwapFrom(realCursorId));
+							}
 							break;
 						default:
 							ensureCoverage(msg);
@@ -921,7 +973,7 @@
 		const onClose = () => {
 			connected = false;
 			id = null;
-			player = null;
+			assignedPlayer = null;
 			hasSentInitialSize = false;
 			hasSentInitialColors = false;
 		};
@@ -941,7 +993,6 @@
 		const cur = nodeAt(realCursorId);
 		if (cur.parent === null) return;
 		setRealCursor(cur.parent);
-		swapped = false;
 	};
 
 	const undoActive = (): void => {
@@ -950,12 +1001,11 @@
 		setActiveCursor(cur.parent);
 	};
 
-	const swap = () => {
-		if (realMoveCount === 1 && !swapped) {
-			swapped = true;
-			if (player === 1) player = 2;
-			else player = 1;
-		}
+	const swapReal = (): void => {
+		const cur = nodeAt(realCursorId);
+		if (cur.stonePly !== 1) return;
+		if (cur.playersSwapped) return;
+		setRealCursor(advanceSwapFrom(realCursorId));
 	};
 
 	const epsilon = 1e-3;
@@ -1443,14 +1493,14 @@
 				}}
 				isSwapShown={true}
 				isSwapDisabled={playerMode === 1
-					? realMoveCount !== 1 || swapped
+					? realMoveCount !== 1 || nodeAt(realCursorId).playersSwapped
 					: !connected ||
 						realMoveCount !== 1 ||
 						!myTurn ||
-						swapped ||
+						nodeAt(realCursorId).playersSwapped ||
 						isPreviewEnabled}
 				swap={() => {
-					swap();
+					swapReal();
 					if (playerMode !== 1 && connected && !isPreviewEnabled)
 						send(playerMode.socket, { type: "swap" });
 				}}

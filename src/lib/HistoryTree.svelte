@@ -4,6 +4,7 @@
 		id: NodeId;
 		parent: NodeId | null;
 		ply: number;
+		kind: "root" | "stone" | "swap";
 		children: NodeId[];
 	};
 
@@ -162,6 +163,7 @@
 						transform={`translate(${pos.x} ${pos.y})`}
 						class="node"
 						class:root={isRoot(id)}
+						class:swap={n.kind === "swap"}
 						class:real={isReal(id)}
 						class:active={isActive(id)}
 						class:hovered={isHovered(id)}
@@ -268,6 +270,10 @@
 
 	.node.root circle:first-child {
 		stroke: rgba(0, 0, 0, 0.25);
+	}
+
+	.node.swap circle:first-child {
+		stroke-dasharray: 3 2;
 	}
 
 	.treeWrap:not(.isInteractive) {
