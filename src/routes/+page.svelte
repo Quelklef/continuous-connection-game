@@ -91,6 +91,8 @@
 	onMount(() => {
 		const url = new URL(location.href);
 		const fromQuery = url.searchParams.get("ws");
+		const relayTarget = url.searchParams.get("relay_target");
+		const relaySecure = url.searchParams.get("relay_secure") === "true";
 		const fromQueryEnabled = url.searchParams.get("mp");
 
 		let fromStorageUrl: string | null = null;
@@ -102,7 +104,13 @@
 			fromStorageEnabled = localStorage.getItem(wsEnabledStorageKey);
 		} catch {}
 
+		const fromRelay =
+			relayTarget && relayTarget.trim()
+				? `${relaySecure ? "wss" : "ws"}://${relayTarget.trim()}`
+				: null;
+
 		const initialUrl =
+			(fromRelay && isValidWsUrl(fromRelay) && fromRelay) ||
 			(fromQuery && isValidWsUrl(fromQuery) && fromQuery) ||
 			(fromStorageUrl && isValidWsUrl(fromStorageUrl) && fromStorageUrl) ||
 			defaultWsUrl();

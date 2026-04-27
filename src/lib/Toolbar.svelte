@@ -163,8 +163,26 @@
 		}
 		if (!ok || !result) return;
 
-		if (next) result.searchParams.set("ws", next);
-		else result.searchParams.delete("ws");
+		if (!next) {
+			result.searchParams.delete("relay_target");
+			result.searchParams.delete("relay_secure");
+		} else {
+			let ok2: boolean;
+			let parsed: URL | null = null;
+			try {
+				parsed = new URL(next);
+				ok2 = true;
+			} catch {
+				ok2 = false;
+			}
+			if (!ok2 || !parsed) return;
+
+			const isSecure = parsed.protocol === "wss:";
+			const relayTarget = `${parsed.host}${parsed.pathname}${parsed.search}`;
+			result.searchParams.set("relay_target", relayTarget);
+			if (isSecure) result.searchParams.set("relay_secure", "true");
+			else result.searchParams.delete("relay_secure");
+		}
 
 		window.history.replaceState({}, "", result.toString());
 	};
