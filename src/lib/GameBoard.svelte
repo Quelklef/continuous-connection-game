@@ -774,10 +774,207 @@
 
 	const colorStorageKeyP1 = "continuous-connection-game.color.p1";
 	const colorStorageKeyP2 = "continuous-connection-game.color.p2";
+	const gameStateStorageKey = $derived(
+		playerMode === 1
+			? "continuous-connection-game.state.local"
+			: `continuous-connection-game.state.ws.${encodeURIComponent(wsUrl.trim())}`,
+	);
 	let isUsingDefaultColors = $derived(
 		normalizeHex(player1Color) === normalizeHex(defaultPlayer1Color) &&
 			normalizeHex(player2Color) === normalizeHex(defaultPlayer2Color),
 	);
+
+	const isNodeId = (u: unknown): u is NodeId =>
+		isFiniteNumber(u) && Number.isInteger(u) && u >= 0;
+
+	const isHistoryMove = (u: unknown): u is HistoryMove => {
+		if (typeof u !== "object" || u === null) return false;
+		if (!("kind" in u)) return false;
+
+		const kind = (u as HistoryMove).kind;
+		switch (kind) {
+			case "stone":
+				return (
+					"coords" in u &&
+					isMoveData((u as { kind: "stone"; coords: unknown }).coords)
+				);
+			case "swap":
+				return true;
+			default:
+				return false;
+		}
+	};
+
+	const isHistoryNode = (u: unknown): u is HistoryNode => {
+		if (typeof u !== "object" || u === null) return false;
+		if (!("id" in u) || !isNodeId((u as HistoryNode).id)) return false;
+		if (!("parent" in u)) return false;
+		const parent = (u as HistoryNode).parent;
+		if (parent !== null && !isNodeId(parent)) return false;
+		if (!("move" in u)) return false;
+		const move = (u as HistoryNode).move;
+		if (move !== null && !isHistoryMove(move)) return false;
+		if (!("kind" in u)) return false;
+		const kind = (u as HistoryNode).kind;
+		if (kind !== "root" && kind !== "stone" && kind !== "swap") return false;
+		if (!("ply" in u) || !isNodeId((u as HistoryNode).ply)) return false;
+		if (!("stonePly" in u) || !isNodeId((u as HistoryNode).stonePly))
+			return false;
+		if (
+			!("playersSwapped" in u) ||
+			typeof (u as HistoryNode).playersSwapped !== "boolean"
+		)
+			return false;
+		if (!("children" in u) || !Array.isArray((u as HistoryNode).children))
+			return false;
+		if (!(u as HistoryNode).children.every(isNodeId)) return false;
+		return true;
+	};
+
+	type PersistedStateV1 = {
+		v: 1;
+		size: number;
+		historyNodes: (HistoryNode | null)[];
+		historyRootId: NodeId;
+		historyNextId: NodeId;
+		realCursorId: NodeId;
+		activeCursorId: NodeId;
+		lastPreviewCursorId: NodeId;
+	};
+
+	let hasLoadedPersistedState = $state(false);
+	$effect(() => {
+		if (typeof window === "undefined") return;
+		if (hasLoadedPersistedState) return;
+		hasLoadedPersistedState = true;
+
+		const root = historyNodes[historyRootId];
+		const isFresh =
+			!!root &&
+			root.kind === "root" &&
+			root.children.length === 0 &&
+			historyNextId === 1 &&
+			realCursorId === historyRootId;
+		if (!isFresh) return;
+
+		let ok: boolean;
+		let err: unknown;
+		let raw: string | null = null;
+		try {
+			raw = localStorage.getItem(gameStateStorageKey);
+			ok = true;
+		} catch (e) {
+			err = e;
+			ok = false;
+		}
+		if (!ok) {
+			console.warn("failed to read persisted game state", err);
+			return;
+		}
+		if (!raw) return;
+
+		let ok2: boolean;
+		let err2: unknown;
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(raw);
+			ok2 = true;
+		} catch (e) {
+			err2 = e;
+			ok2 = false;
+		}
+		if (!ok2) {
+			console.warn("persisted game state JSON did not parse", err2);
+			return;
+		}
+		if (typeof parsed !== "object" || parsed === null) return;
+		if (!("v" in parsed) || (parsed as PersistedStateV1).v !== 1) return;
+
+		const typed = parsed as PersistedStateV1;
+		if (!isValidBoardSize(typed.size)) return;
+		if (!Array.isArray(typed.historyNodes)) return;
+		if (!isNodeId(typed.historyRootId)) return;
+		if (!isNodeId(typed.historyNextId)) return;
+		if (!isNodeId(typed.realCursorId)) return;
+		if (!isNodeId(typed.activeCursorId)) return;
+		if (!isNodeId(typed.lastPreviewCursorId)) return;
+
+		const nodes = typed.historyNodes;
+		if (nodes.length === 0) return;
+		if (!nodes.every((n) => n === null || isHistoryNode(n))) return;
+		if (typed.historyRootId !== 0) return;
+		if (!nodes[0] || nodes[0].kind !== "root") return;
+
+		const hasNodeAt = (id: NodeId): boolean => !!nodes[id];
+		if (!hasNodeAt(typed.realCursorId)) return;
+		if (!hasNodeAt(typed.activeCursorId)) return;
+		if (!hasNodeAt(typed.lastPreviewCursorId)) return;
+
+		size = typed.size;
+		historyNodes = nodes;
+		historyRootId = typed.historyRootId;
+		historyNextId = typed.historyNextId;
+		realCursorId = typed.realCursorId;
+		activeCursorId = typed.activeCursorId;
+		lastPreviewCursorId = typed.lastPreviewCursorId;
+		hoverCursorId = null;
+	});
+
+	let persistGameStateTimer: number | null = $state(null);
+	$effect(() => {
+		if (typeof window === "undefined") return;
+
+		const snapshot: PersistedStateV1 = {
+			v: 1,
+			size,
+			historyNodes,
+			historyRootId,
+			historyNextId,
+			realCursorId,
+			activeCursorId,
+			lastPreviewCursorId,
+		};
+		const key = gameStateStorageKey;
+
+		if (persistGameStateTimer !== null) {
+			window.clearTimeout(persistGameStateTimer);
+			persistGameStateTimer = null;
+		}
+
+		persistGameStateTimer = window.setTimeout(() => {
+			let ok: boolean;
+			let err: unknown;
+			let json: string | null = null;
+			try {
+				json = JSON.stringify(snapshot);
+				ok = true;
+			} catch (e) {
+				err = e;
+				ok = false;
+			}
+			if (!ok || json === null) {
+				console.warn("failed to stringify persisted game state", err);
+				return;
+			}
+
+			let ok2: boolean;
+			let err2: unknown;
+			try {
+				localStorage.setItem(key, json);
+				ok2 = true;
+			} catch (e) {
+				err2 = e;
+				ok2 = false;
+			}
+			if (!ok2) console.warn("failed to persist game state", err2);
+		}, 160);
+
+		return () => {
+			if (persistGameStateTimer === null) return;
+			window.clearTimeout(persistGameStateTimer);
+			persistGameStateTimer = null;
+		};
+	});
 
 	$effect(() => {
 		if (typeof window === "undefined") return;
