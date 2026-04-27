@@ -471,6 +471,8 @@
 	});
 
 	let isShiftHeld = $state(false);
+	let boardShotCopyState = $state<"idle" | "copied" | "failed">("idle");
+	let boardShotCopyToken = $state(0);
 	$effect(() => {
 		if (typeof window === "undefined") return;
 
@@ -567,6 +569,147 @@
 			window.removeEventListener("pointermove", onWindowPointerMove);
 		};
 	});
+
+	const showBoardShotCopyState = (next: "copied" | "failed"): void => {
+		boardShotCopyState = next;
+		boardShotCopyToken += 1;
+		const token = boardShotCopyToken;
+		window.setTimeout(() => {
+			if (boardShotCopyToken !== token) return;
+			boardShotCopyState = "idle";
+		}, 1200);
+	};
+
+	const loadImageFromUrl = (url: string): Promise<HTMLImageElement> =>
+		new Promise((resolve, reject) => {
+			const img = new Image();
+			img.onload = () => resolve(img);
+			img.onerror = (e) => reject(e);
+			img.src = url;
+		});
+
+	const copyBoardShot = async (): Promise<void> => {
+		if (typeof window === "undefined") return;
+		if (!svg) return;
+		if (!navigator.clipboard || typeof ClipboardItem === "undefined") {
+			showBoardShotCopyState("failed");
+			return;
+		}
+
+		const rect = svg.getBoundingClientRect();
+		if (rect.width <= 0 || rect.height <= 0) {
+			showBoardShotCopyState("failed");
+			return;
+		}
+
+		const dpr = window.devicePixelRatio || 1;
+		const wPx = Math.round(rect.width * dpr);
+		const hPx = Math.round(rect.height * dpr);
+
+		const style = window.getComputedStyle(svg);
+		const borderPx = Math.max(0, Number.parseFloat(style.borderTopWidth) || 0) * dpr;
+
+		const canvas = document.createElement("canvas");
+		canvas.width = wPx;
+		canvas.height = hPx;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) {
+			showBoardShotCopyState("failed");
+			return;
+		}
+
+		const bg = ctx.createLinearGradient(0, 0, 0, hPx);
+		bg.addColorStop(0, "#f3efe6");
+		bg.addColorStop(1, "#e8e1d5");
+		ctx.fillStyle = bg;
+		ctx.fillRect(0, 0, wPx, hPx);
+
+		const radial = ctx.createRadialGradient(wPx * 0.2, hPx * 0.18, 0, wPx * 0.2, hPx * 0.18, Math.max(wPx, hPx) * 0.7);
+		radial.addColorStop(0, "rgba(255,255,255,0.75)");
+		radial.addColorStop(0.6, "rgba(255,255,255,0)");
+		ctx.fillStyle = radial;
+		ctx.fillRect(0, 0, wPx, hPx);
+
+		if (borderPx > 0) {
+			ctx.fillStyle = style.borderTopColor;
+			ctx.fillRect(0, 0, wPx, borderPx);
+			ctx.fillStyle = style.borderBottomColor;
+			ctx.fillRect(0, hPx - borderPx, wPx, borderPx);
+			ctx.fillStyle = style.borderLeftColor;
+			ctx.fillRect(0, 0, borderPx, hPx);
+			ctx.fillStyle = style.borderRightColor;
+			ctx.fillRect(wPx - borderPx, 0, borderPx, hPx);
+		}
+
+		const serializer = new XMLSerializer();
+		const rawSvg = serializer.serializeToString(svg);
+		const svgText = rawSvg.includes('xmlns="http://www.w3.org/2000/svg"')
+			? rawSvg
+			: rawSvg.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
+		const svgBlob = new Blob([svgText], { type: "image/svg+xml;charset=utf-8" });
+		const url = URL.createObjectURL(svgBlob);
+
+		let ok: boolean;
+		let err: unknown;
+		let img: HTMLImageElement | null = null;
+		try {
+			img = await loadImageFromUrl(url);
+			ok = true;
+		} catch (e) {
+			err = e;
+			ok = false;
+		} finally {
+			URL.revokeObjectURL(url);
+		}
+
+		if (!ok || !img) {
+			console.warn("failed to render svg", err);
+			showBoardShotCopyState("failed");
+			return;
+		}
+
+		const innerW = wPx - borderPx * 2;
+		const innerH = hPx - borderPx * 2;
+		ctx.drawImage(img, borderPx, borderPx, innerW, innerH);
+
+		let ok2: boolean;
+		let err2: unknown;
+		let pngBlob: Blob | null = null;
+		try {
+			pngBlob = await new Promise<Blob | null>((resolve) =>
+				canvas.toBlob(resolve, "image/png"),
+			);
+			ok2 = true;
+		} catch (e) {
+			err2 = e;
+			ok2 = false;
+		}
+		if (!ok2 || !pngBlob) {
+			console.warn("failed to create png", err2);
+			showBoardShotCopyState("failed");
+			return;
+		}
+
+		let ok3: boolean;
+		let err3: unknown;
+		try {
+			await navigator.clipboard.write([
+				new ClipboardItem({ "image/png": pngBlob }),
+			]);
+			ok3 = true;
+		} catch (e) {
+			err3 = e;
+			ok3 = false;
+		}
+
+		if (!ok3) {
+			console.warn("failed to write clipboard", err3);
+			showBoardShotCopyState("failed");
+			return;
+		}
+
+		showBoardShotCopyState("copied");
+	};
 
 	const colorStorageKeyP1 = "continuous-connection-game.color.p1";
 	const colorStorageKeyP2 = "continuous-connection-game.color.p2";
@@ -1241,6 +1384,8 @@
 				{connected}
 				{isMultiplayerEnabled}
 				setMultiplayerEnabled={(next) => setMultiplayerEnabled?.(next)}
+				{copyBoardShot}
+				{boardShotCopyState}
 				{size}
 				movesPlayed={realMoveCount}
 				{minBoardSize}
