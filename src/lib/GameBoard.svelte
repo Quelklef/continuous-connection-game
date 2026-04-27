@@ -329,6 +329,17 @@
 		}
 	};
 
+	let turnPlayer = $derived(playerFromIndex(realMoveCount));
+	let turnColor = $derived(playerColor(turnPlayer));
+	let turnTextColor = $derived(readableTextColorOn(turnColor).fill);
+	let turnText = $derived(
+		(() => {
+			if (playerMode === 1) return `Turn: P${turnPlayer}`;
+			if (player === null) return "Turn: —";
+			return myTurn ? "Turn: YOURS" : "Turn: THEIRS";
+		})(),
+	);
+
 	const setMouseLocFromClient = (clientX: number, clientY: number): void => {
 		if (!svg) return;
 
@@ -1386,6 +1397,9 @@
 				setMultiplayerEnabled={(next) => setMultiplayerEnabled?.(next)}
 				{copyBoardShot}
 				{boardShotCopyState}
+				{turnText}
+				{turnColor}
+				turnTextColor={turnTextColor}
 				{size}
 				movesPlayed={realMoveCount}
 				{minBoardSize}

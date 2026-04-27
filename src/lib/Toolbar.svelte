@@ -8,6 +8,10 @@
 		copyBoardShot: () => void;
 		boardShotCopyState: "idle" | "copied" | "failed";
 
+		turnText: string;
+		turnColor: string;
+		turnTextColor: string;
+
 		size: number;
 		movesPlayed: number;
 		minBoardSize: number;
@@ -47,6 +51,10 @@
 
 		copyBoardShot,
 		boardShotCopyState,
+
+		turnText,
+		turnColor,
+		turnTextColor,
 
 		size,
 		movesPlayed,
@@ -348,6 +356,13 @@
 		<div class="section">
 			<div class="sectionTitle">
 				<div>actions</div>
+			</div>
+			<div
+				class="turnPill"
+				style:background={turnColor}
+				style:color={turnTextColor}
+			>
+				{turnText}
 			</div>
 			<div class="buttons">
 				<button class="btn" disabled={isUndoDisabled} onclick={undo}>
@@ -891,6 +906,23 @@
 		display: grid;
 		grid-template-columns: 1fr;
 		gap: 6px;
+	}
+
+	.turnPill {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: var(--control-h);
+		box-sizing: border-box;
+		padding: 0.5em 1em;
+		border-radius: 999px;
+		font-weight: 750;
+		letter-spacing: 0.2px;
+		border: 1px solid rgba(0, 0, 0, 0.14);
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.5),
+			0 8px 22px rgba(0, 0, 0, 0.14);
+		margin-bottom: 8px;
 	}
 
 	.btn {
