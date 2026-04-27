@@ -1336,20 +1336,17 @@
 					)}
 				{/each}
 
-				{#if isShiftHeld && displayMoveCount > 0}
+				{#if isShiftHeld && displayMoveCount > 0 && svgPixels && svgPixels.w > 0}
 					{@const latestCoords = displayMoves[displayMoveCount - 1]}
+					{@const unitsPerPx = viewBox.w / svgPixels.w}
+					{@const t = unitsPerPx * 2}
 					{#if latestCoords}
-						<rect
-							x={latestCoords[0] - 1 / 2}
-							y={latestCoords[1] - 1 / 2}
-							width="1"
-							height="1"
-							fill="none"
-							stroke="black"
-							stroke-width="2"
-							vector-effect="non-scaling-stroke"
+						<path
+							d={`M ${latestCoords[0] - 1 / 2 - t} ${latestCoords[1] - 1 / 2 - t} h ${1 + 2 * t} v ${1 + 2 * t} h ${-(1 + 2 * t)} Z M ${latestCoords[0] - 1 / 2} ${latestCoords[1] - 1 / 2} h 1 v 1 h -1 Z`}
+							fill="rgba(0,0,0,0.95)"
+							fill-rule="evenodd"
 							style:pointer-events="none"
-						></rect>
+						></path>
 					{/if}
 				{/if}
 
