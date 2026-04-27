@@ -1240,7 +1240,7 @@
 				isUndoDisabled={(isPreviewEnabled
 					? activeMoveCount === 0
 					: realMoveCount === 0) ||
-					(playerMode !== 1 && !isPreviewEnabled && (!connected || !myTurn))}
+					(playerMode !== 1 && !isPreviewEnabled && !connected)}
 				undo={() => {
 					if (playerMode === 1) {
 						undoReal();
