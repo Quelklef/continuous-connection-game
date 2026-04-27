@@ -842,11 +842,19 @@
 		lastPreviewCursorId: NodeId;
 	};
 
-	let hasLoadedPersistedState = $state(false);
+	let loadedPersistedStateKey: string | null = $state(null);
+	let hasSettledPersistedStateLoad = $state(false);
+	let lastPersistedGameStateJson = $state<string | null>(null);
 	$effect(() => {
 		if (typeof window === "undefined") return;
-		if (hasLoadedPersistedState) return;
-		hasLoadedPersistedState = true;
+		if (
+			loadedPersistedStateKey === gameStateStorageKey &&
+			hasSettledPersistedStateLoad
+		)
+			return;
+
+		loadedPersistedStateKey = gameStateStorageKey;
+		hasSettledPersistedStateLoad = false;
 
 		const root = historyNodes[historyRootId];
 		const isFresh =
@@ -855,7 +863,10 @@
 			root.children.length === 0 &&
 			historyNextId === 1 &&
 			realCursorId === historyRootId;
-		if (!isFresh) return;
+		if (!isFresh) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
 
 		let ok: boolean;
 		let err: unknown;
@@ -869,9 +880,13 @@
 		}
 		if (!ok) {
 			console.warn("failed to read persisted game state", err);
+			hasSettledPersistedStateLoad = true;
 			return;
 		}
-		if (!raw) return;
+		if (!raw) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
 
 		let ok2: boolean;
 		let err2: unknown;
@@ -885,30 +900,79 @@
 		}
 		if (!ok2) {
 			console.warn("persisted game state JSON did not parse", err2);
+			hasSettledPersistedStateLoad = true;
 			return;
 		}
-		if (typeof parsed !== "object" || parsed === null) return;
-		if (!("v" in parsed) || (parsed as PersistedStateV1).v !== 1) return;
+		if (typeof parsed !== "object" || parsed === null) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!("v" in parsed) || (parsed as PersistedStateV1).v !== 1) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
 
 		const typed = parsed as PersistedStateV1;
-		if (!isValidBoardSize(typed.size)) return;
-		if (!Array.isArray(typed.historyNodes)) return;
-		if (!isNodeId(typed.historyRootId)) return;
-		if (!isNodeId(typed.historyNextId)) return;
-		if (!isNodeId(typed.realCursorId)) return;
-		if (!isNodeId(typed.activeCursorId)) return;
-		if (!isNodeId(typed.lastPreviewCursorId)) return;
+		if (!isValidBoardSize(typed.size)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!Array.isArray(typed.historyNodes)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!isNodeId(typed.historyRootId)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!isNodeId(typed.historyNextId)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!isNodeId(typed.realCursorId)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!isNodeId(typed.activeCursorId)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!isNodeId(typed.lastPreviewCursorId)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
 
 		const nodes = typed.historyNodes;
-		if (nodes.length === 0) return;
-		if (!nodes.every((n) => n === null || isHistoryNode(n))) return;
-		if (typed.historyRootId !== 0) return;
-		if (!nodes[0] || nodes[0].kind !== "root") return;
+		if (nodes.length === 0) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!nodes.every((n) => n === null || isHistoryNode(n))) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (typed.historyRootId !== 0) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!nodes[0] || nodes[0].kind !== "root") {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
 
 		const hasNodeAt = (id: NodeId): boolean => !!nodes[id];
-		if (!hasNodeAt(typed.realCursorId)) return;
-		if (!hasNodeAt(typed.activeCursorId)) return;
-		if (!hasNodeAt(typed.lastPreviewCursorId)) return;
+		if (!hasNodeAt(typed.realCursorId)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!hasNodeAt(typed.activeCursorId)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (!hasNodeAt(typed.lastPreviewCursorId)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
 
 		size = typed.size;
 		historyNodes = nodes;
@@ -918,70 +982,166 @@
 		activeCursorId = typed.activeCursorId;
 		lastPreviewCursorId = typed.lastPreviewCursorId;
 		hoverCursorId = null;
+
+		lastPersistedGameStateJson = raw;
+		hasSettledPersistedStateLoad = true;
+	});
+
+	const persistGameStateSnapshot = (): PersistedStateV1 => ({
+		v: 1,
+		size,
+		historyNodes,
+		historyRootId,
+		historyNextId,
+		realCursorId,
+		activeCursorId,
+		lastPreviewCursorId,
 	});
 
 	let persistGameStateTimer: number | null = $state(null);
-	$effect(() => {
-		if (typeof window === "undefined") return;
+	let persistGameStateIdleHandle: number | null = $state(null);
+	let persistGameStateToken = $state(0);
 
-		const snapshot: PersistedStateV1 = {
-			v: 1,
-			size,
-			historyNodes,
-			historyRootId,
-			historyNextId,
-			realCursorId,
-			activeCursorId,
-			lastPreviewCursorId,
-		};
-		const key = gameStateStorageKey;
-
+	const clearPersistSchedule = (): void => {
 		if (persistGameStateTimer !== null) {
 			window.clearTimeout(persistGameStateTimer);
 			persistGameStateTimer = null;
 		}
 
-		persistGameStateTimer = window.setTimeout(() => {
-			let ok: boolean;
-			let err: unknown;
-			let json: string | null = null;
-			try {
-				json = JSON.stringify(snapshot);
-				ok = true;
-			} catch (e) {
-				err = e;
-				ok = false;
-			}
-			if (!ok || json === null) {
-				console.warn("failed to stringify persisted game state", err);
-				return;
-			}
+		if (
+			persistGameStateIdleHandle !== null &&
+			"cancelIdleCallback" in window
+		) {
+			(window as unknown as { cancelIdleCallback: (h: number) => void })
+				.cancelIdleCallback(persistGameStateIdleHandle);
+			persistGameStateIdleHandle = null;
+		}
+	};
 
-			let ok2: boolean;
-			let err2: unknown;
-			try {
-				localStorage.setItem(key, json);
-				ok2 = true;
-			} catch (e) {
-				err2 = e;
-				ok2 = false;
-			}
-			if (!ok2) console.warn("failed to persist game state", err2);
-		}, 160);
+	const flushPersistedGameState = (): void => {
+		clearPersistSchedule();
 
-		return () => {
-			if (persistGameStateTimer === null) return;
-			window.clearTimeout(persistGameStateTimer);
-			persistGameStateTimer = null;
+		const key = gameStateStorageKey;
+		const snapshot = persistGameStateSnapshot();
+
+		let ok: boolean;
+		let err: unknown;
+		let json: string | null = null;
+		try {
+			json = JSON.stringify(snapshot);
+			ok = true;
+		} catch (e) {
+			err = e;
+			ok = false;
+		}
+		if (!ok || json === null) {
+			console.warn("failed to stringify persisted game state", err);
+			return;
+		}
+
+		if (lastPersistedGameStateJson === json) return;
+
+		let ok2: boolean;
+		let err2: unknown;
+		try {
+			localStorage.setItem(key, json);
+			ok2 = true;
+		} catch (e) {
+			err2 = e;
+			ok2 = false;
+		}
+		if (!ok2) {
+			console.warn("failed to persist game state", err2);
+			return;
+		}
+
+		lastPersistedGameStateJson = json;
+	};
+
+	const schedulePersistedGameState = (): void => {
+		persistGameStateToken += 1;
+		const token = persistGameStateToken;
+
+		if (persistGameStateTimer !== null || persistGameStateIdleHandle !== null)
+			return;
+
+		const scheduleFallback = () => {
+			persistGameStateTimer = window.setTimeout(() => {
+				persistGameStateTimer = null;
+				if (persistGameStateToken !== token) schedulePersistedGameState();
+				else flushPersistedGameState();
+			}, 900);
 		};
+
+		if (!("requestIdleCallback" in window)) {
+			scheduleFallback();
+			return;
+		}
+
+		persistGameStateIdleHandle = (
+			window as unknown as {
+				requestIdleCallback: (
+					cb: () => void,
+					opts: { timeout: number },
+				) => number;
+			}
+		).requestIdleCallback(
+			() => {
+				persistGameStateIdleHandle = null;
+				if (persistGameStateToken !== token) schedulePersistedGameState();
+				else flushPersistedGameState();
+			},
+			{ timeout: 1200 },
+		);
+	};
+
+	$effect(() => {
+		if (typeof window === "undefined") return;
+		if (!hasSettledPersistedStateLoad) return;
+		void gameStateStorageKey;
+		void size;
+		void historyNodes;
+		void historyRootId;
+		void historyNextId;
+		void realCursorId;
+		void activeCursorId;
+		void lastPreviewCursorId;
+		schedulePersistedGameState();
+	});
+
+	$effect(() => {
+		if (typeof window === "undefined") return;
+
+		const onVisibilityChange = () => {
+			if (!document.hidden) return;
+			flushPersistedGameState();
+		};
+
+		const onBeforeUnload = () => {
+			flushPersistedGameState();
+		};
+
+		document.addEventListener("visibilitychange", onVisibilityChange);
+		window.addEventListener("beforeunload", onBeforeUnload);
+		return () => {
+			document.removeEventListener("visibilitychange", onVisibilityChange);
+			window.removeEventListener("beforeunload", onBeforeUnload);
+		};
+	});
+
+	$effect(() => {
+		if (typeof window === "undefined") return;
+		return () => clearPersistSchedule();
 	});
 
 	const newGame = (): void => {
 		resetHistory();
 		viewBox = { x: 0, y: 0, w: size, h: size };
 		isPreviewMode = false;
+		lastPersistedGameStateJson = null;
 
 		if (typeof window === "undefined") return;
+		clearPersistSchedule();
 		let ok: boolean;
 		let err: unknown;
 		try {
