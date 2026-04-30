@@ -538,7 +538,6 @@
 
 	let turnPlayer = $derived(playerFromIndex(realMoveCount));
 	let turnColor = $derived(playerColor(turnPlayer));
-	let turnTextColor = $derived(readableTextColorOn(turnColor).fill);
 	let turnText = $derived(
 		(() => {
 			if (playerMode === 1) return `Turn: P${turnPlayer}`;
@@ -2388,7 +2387,6 @@
 				{boardShotCopyState}
 				{turnText}
 				{turnColor}
-				{turnTextColor}
 				{size}
 				movesPlayed={realMoveCount}
 				{minBoardSize}
