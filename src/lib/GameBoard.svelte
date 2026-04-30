@@ -1203,9 +1203,9 @@
 				: realCursorId,
 	});
 
-	let persistGameStateTimer: number | null = $state(null);
-	let persistGameStateIdleHandle: number | null = $state(null);
-	let persistGameStateToken = $state(0);
+	let persistGameStateTimer: number | null = null;
+	let persistGameStateIdleHandle: number | null = null;
+	let persistGameStateToken = 0;
 
 	const clearPersistSchedule = (): void => {
 		if (persistGameStateTimer !== null) {
