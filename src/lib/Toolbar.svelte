@@ -11,6 +11,17 @@
 		turnText: string;
 		turnColor: string;
 
+		clockStarted: boolean;
+		clockPaused: boolean;
+		clockTotalMs: number;
+		clockGainMs: number;
+		clockRemainingMsP1: number;
+		clockRemainingMsP2: number;
+		clockActivePlayer: 1 | 2;
+		setClockTotalMs: (next: number) => void;
+		setClockGainMs: (next: number) => void;
+		toggleClockPaused: () => void;
+
 		size: number;
 		movesPlayed: number;
 		minBoardSize: number;
@@ -55,6 +66,17 @@
 		turnText,
 		turnColor,
 
+		clockStarted,
+		clockPaused,
+		clockTotalMs,
+		clockGainMs,
+		clockRemainingMsP1,
+		clockRemainingMsP2,
+		clockActivePlayer,
+		setClockTotalMs,
+		setClockGainMs,
+		toggleClockPaused,
+
 		size,
 		movesPlayed,
 		minBoardSize,
@@ -93,6 +115,40 @@
 		isMultiplayerEnabled ? (connected ? "online" : "connecting") : "local",
 	);
 	let isWsDirty = $derived(wsUrlDraft.trim() !== wsUrl.trim());
+
+	const clampInt = (v: number, lo: number, hi: number): number =>
+		Math.max(lo, Math.min(hi, Math.round(v)));
+
+	const formatMs = (msRaw: number): string => {
+		const ms = Math.trunc(msRaw);
+		const isNeg = ms < 0;
+		const abs = Math.abs(ms);
+		const totalSeconds = Math.floor(abs / 1000);
+		const s = totalSeconds % 60;
+		const m = Math.floor(totalSeconds / 60) % 60;
+		const h = Math.floor(totalSeconds / 3600);
+		const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+		const ss = String(s).padStart(2, "0");
+		return `${isNeg ? "-" : ""}${h > 0 ? `${h}:` : ""}${mm}:${ss}`;
+	};
+
+	let totalSecondsDraft = $state("");
+	let gainSecondsDraft = $state("");
+	$effect(() => {
+		totalSecondsDraft = String(Math.round(clockTotalMs / 1000));
+		gainSecondsDraft = String(Math.round(clockGainMs / 1000));
+	});
+
+	const commitTotal = (): void => {
+		const parsed = Number.parseInt(totalSecondsDraft.trim(), 10);
+		if (Number.isNaN(parsed)) return;
+		setClockTotalMs(clampInt(parsed, 0, 24 * 60 * 60) * 1000);
+	};
+	const commitGain = (): void => {
+		const parsed = Number.parseInt(gainSecondsDraft.trim(), 10);
+		if (Number.isNaN(parsed)) return;
+		setClockGainMs(clampInt(parsed, 0, 24 * 60 * 60) * 1000);
+	};
 
 	let isSizeEditing = $state(false);
 	let sizeDraft = $state("");
@@ -253,6 +309,81 @@
 					{/if}
 				</div>
 			</div>
+		</div>
+
+		<div class="section">
+			<div class="sectionTitle">
+				<div>turn timer</div>
+			</div>
+			<div class="timerTop">
+				<div class="timerParams">
+					<label class="timerParam">
+						<span class="muted">total</span>
+						<input
+							class="timerInput"
+							inputmode="numeric"
+							aria-label="Turn timer total seconds"
+							bind:value={totalSecondsDraft}
+							onblur={commitTotal}
+							onkeydown={(e) => {
+								if (e.key === "Enter") commitTotal();
+							}}
+						/>
+					</label>
+					<label class="timerParam">
+						<span class="muted">gain</span>
+						<input
+							class="timerInput"
+							inputmode="numeric"
+							aria-label="Turn timer gain seconds"
+							bind:value={gainSecondsDraft}
+							onblur={commitGain}
+							onkeydown={(e) => {
+								if (e.key === "Enter") commitGain();
+							}}
+						/>
+					</label>
+				</div>
+				<button
+					class="iconBtn"
+					title={clockPaused ? "Resume turn timer" : "Pause turn timer"}
+					aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
+					onclick={toggleClockPaused}
+				>
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						{#if clockPaused}
+							<path
+								d="M9 7.2v9.6L17.4 12 9 7.2Z"
+								fill="currentColor"
+								opacity="0.9"
+							/>
+						{:else}
+							<path
+								d="M7.5 6.5h3v11h-3v-11Zm6 0h3v11h-3v-11Z"
+								fill="currentColor"
+								opacity="0.9"
+							/>
+						{/if}
+					</svg>
+				</button>
+			</div>
+			<div class="timerGrid" aria-label="Turn timer">
+				<div class="timerRow" class:active={clockActivePlayer === 1}>
+					<div class="muted">p1</div>
+					<div class="timerValue" class:overtime={clockRemainingMsP1 < 0}>
+						{formatMs(clockRemainingMsP1)}
+					</div>
+				</div>
+				<div class="timerRow" class:active={clockActivePlayer === 2}>
+					<div class="muted">p2</div>
+					<div class="timerValue" class:overtime={clockRemainingMsP2 < 0}>
+						{formatMs(clockRemainingMsP2)}
+					</div>
+				</div>
+			</div>
+			{#if !clockStarted}
+				<div class="timerNote muted">starts after p1’s first move</div>
+			{/if}
 		</div>
 
 		<div class="section">
@@ -944,6 +1075,76 @@
 	.turnInline {
 		font-weight: 750;
 		letter-spacing: 0.2px;
+	}
+
+	.timerTop {
+		display: flex;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 10px;
+		margin-bottom: 8px;
+	}
+
+	.timerGrid {
+		display: grid;
+		gap: 6px;
+	}
+
+	.timerRow {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+		padding: 6px 8px;
+		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.55);
+		border: 1px solid rgba(0, 0, 0, 0.06);
+	}
+
+	.timerRow.active {
+		background: rgba(255, 255, 255, 0.85);
+		border-color: rgba(0, 0, 0, 0.12);
+	}
+
+	.timerValue {
+		font-variant-numeric: tabular-nums;
+		font-weight: 750;
+		letter-spacing: 0.2px;
+		padding: 2px 6px;
+		border-radius: 10px;
+	}
+
+	.timerValue.overtime {
+		background: rgba(200, 20, 40, 0.95);
+		color: white;
+		font-weight: 900;
+	}
+
+	.timerNote {
+		margin-top: 8px;
+		font-size: 12px;
+	}
+
+	.timerParams {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 6px;
+	}
+
+	.timerParam {
+		display: grid;
+		gap: 3px;
+	}
+
+	.timerInput {
+		height: 30px;
+		padding: 0 8px;
+		border-radius: 10px;
+		border: 1px solid rgba(0, 0, 0, 0.12);
+		background: rgba(255, 255, 255, 0.92);
+		color: rgba(0, 0, 0, 0.86);
+		font-weight: 650;
+		font-variant-numeric: tabular-nums;
 	}
 
 	.btn {

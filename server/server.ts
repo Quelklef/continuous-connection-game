@@ -9,6 +9,7 @@ import { Bad, ensureCoverage } from "../shared/lib.ts";
 import {
 	isBoardColors,
 	isFiniteNumber,
+	isClockOp,
 	isMoveData,
 	isValidBoardSize,
 } from "../shared/validate.ts";
@@ -98,6 +99,11 @@ const parseWs = (data: string): ClientMessage | Bad => {
 		case "undo":
 		case "swap":
 			return parsed as ClientMessage;
+		case "clock": {
+			const d = (typedMessage as { data: unknown }).data;
+			if (isClockOp(d)) return parsed as ClientMessage;
+			return new Bad("'clock' type has incorrect data");
+		}
 		case "shared preview":
 			if (isSharedPreviewOp(typedMessage.data)) return parsed as ClientMessage;
 			else return new Bad("'shared preview' type has incorrect data");
@@ -168,10 +174,21 @@ wss.on("connection", (ws) => {
 					const otherClients: WebSocket[] = Object.entries(connections)
 						.filter(([cid]) => cid !== wsId.toString())
 						.map((a) => a[1]);
+					const allClients: WebSocket[] = Object.values(connections);
 
 					switch (message.type) {
 						case "move":
-							otherClients.forEach((client) => send(client, message));
+							{
+								const atMs = Date.now();
+								const msg: ServerMessage = {
+									type: "move",
+									data: {
+										senderId: wsId,
+										move: { coords: message.data, atMs },
+									},
+								};
+								allClients.forEach((client) => send(client, msg));
+							}
 							break;
 						case "set size":
 							boardSize = message.data;
@@ -183,7 +200,24 @@ wss.on("connection", (ws) => {
 							break;
 						case "undo":
 						case "swap":
-							otherClients.forEach((client) => send(client, message));
+							{
+								const atMs = Date.now();
+								const msg: ServerMessage = {
+									type: message.type,
+									data: { senderId: wsId, atMs },
+								};
+								allClients.forEach((client) => send(client, msg));
+							}
+							break;
+						case "clock":
+							{
+								const atMs = Date.now();
+								const msg: ServerMessage = {
+									type: "clock",
+									data: { senderId: wsId, atMs, op: message.data },
+								};
+								allClients.forEach((client) => send(client, msg));
+							}
 							break;
 						case "shared preview":
 							otherClients.forEach((client) =>

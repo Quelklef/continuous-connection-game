@@ -3,6 +3,7 @@
 	import type {
 		ServerMessage,
 		InnerClientMessage,
+		ClockSettings,
 		MoveData,
 		Player,
 		SharedPreviewOp,
@@ -10,8 +11,11 @@
 	} from "../../shared/types.ts";
 	import {
 		isBoardColors,
+		isClockOp,
 		isFiniteNumber,
 		isMoveData,
+		isTimedMoveData,
+		isStampedOp,
 		isValidBoardSize,
 		isValidHexColor,
 		MAX_BOARD_SIZE,
@@ -546,6 +550,100 @@
 		})(),
 	);
 
+	const defaultClockSettings: ClockSettings = {
+		totalMs: 5 * 60 * 1000,
+		gainMs: 0,
+	};
+	let clockSettings = $state<ClockSettings>(defaultClockSettings);
+	let clockStarted = $state(false);
+	let clockPaused = $state(false);
+	let clockRemainingMsP1 = $state(defaultClockSettings.totalMs);
+	let clockRemainingMsP2 = $state(defaultClockSettings.totalMs);
+	let clockLastAtMs = $state<number | null>(null);
+	let clockUiNowMs = $state<number>(0);
+
+	const resetClock = (settings: ClockSettings): void => {
+		clockSettings = settings;
+		clockStarted = false;
+		clockPaused = false;
+		clockRemainingMsP1 = settings.totalMs;
+		clockRemainingMsP2 = settings.totalMs;
+		clockLastAtMs = null;
+		clockUiNowMs = 0;
+	};
+
+	const settleClockTo = (activePlayer: Player, atMs: number): void => {
+		if (!clockStarted) {
+			clockLastAtMs = atMs;
+			return;
+		}
+		if (clockPaused) {
+			clockLastAtMs = atMs;
+			return;
+		}
+		if (clockLastAtMs === null) {
+			clockLastAtMs = atMs;
+			return;
+		}
+
+		const elapsedMs = atMs - clockLastAtMs;
+		if (!isFiniteNumber(elapsedMs) || elapsedMs <= 0) {
+			clockLastAtMs = atMs;
+			return;
+		}
+
+		if (activePlayer === 1) clockRemainingMsP1 -= elapsedMs;
+		else clockRemainingMsP2 -= elapsedMs;
+		clockLastAtMs = atMs;
+	};
+
+	const applyClockTurnTransition = (
+		prevTurnPlayer: Player,
+		nextTurnPlayer: Player,
+		atMs: number,
+	): void => {
+		if (!clockStarted || clockPaused) {
+			clockLastAtMs = atMs;
+			return;
+		}
+
+		if (prevTurnPlayer !== nextTurnPlayer) {
+			if (nextTurnPlayer === 1) clockRemainingMsP1 += clockSettings.gainMs;
+			else clockRemainingMsP2 += clockSettings.gainMs;
+		}
+		clockLastAtMs = atMs;
+	};
+
+	$effect(() => {
+		if (typeof window === "undefined") return;
+		if (!clockStarted || clockPaused) return;
+
+		clockUiNowMs = Date.now();
+		const t = window.setInterval(() => {
+			clockUiNowMs = Date.now();
+		}, 200);
+		return () => window.clearInterval(t);
+	});
+
+	const clockDisplayRemainingMsP1 = $derived(
+		(() => {
+			if (!clockStarted || clockPaused) return clockRemainingMsP1;
+			if (turnPlayer !== 1) return clockRemainingMsP1;
+			if (clockLastAtMs === null || clockUiNowMs <= 0)
+				return clockRemainingMsP1;
+			return clockRemainingMsP1 - (clockUiNowMs - clockLastAtMs);
+		})(),
+	);
+	const clockDisplayRemainingMsP2 = $derived(
+		(() => {
+			if (!clockStarted || clockPaused) return clockRemainingMsP2;
+			if (turnPlayer !== 2) return clockRemainingMsP2;
+			if (clockLastAtMs === null || clockUiNowMs <= 0)
+				return clockRemainingMsP2;
+			return clockRemainingMsP2 - (clockUiNowMs - clockLastAtMs);
+		})(),
+	);
+
 	const setMouseLocFromClient = (clientX: number, clientY: number): void => {
 		if (!svg) return;
 
@@ -1007,13 +1105,19 @@
 		return true;
 	};
 
-	type PersistedStateV2 = {
-		v: 2;
+	type PersistedStateV3 = {
+		v: 3;
 		size: number;
 		historyNodes: (HistoryNode | null)[];
 		historyRootId: NodeId;
 		historyNextId: NodeId;
 		realCursorId: NodeId;
+
+		clockSettings: ClockSettings;
+		clockStarted: boolean;
+		clockPaused: boolean;
+		clockRemainingMsP1: number;
+		clockRemainingMsP2: number;
 	};
 
 	type PersistedStateV1Legacy = {
@@ -1025,6 +1129,15 @@
 		realCursorId: NodeId;
 		activeCursorId: NodeId;
 		lastPreviewCursorId: NodeId;
+	};
+
+	type PersistedStateV2Legacy = {
+		v: 2;
+		size: number;
+		historyNodes: (HistoryNode | null)[];
+		historyRootId: NodeId;
+		historyNextId: NodeId;
+		realCursorId: NodeId;
 	};
 
 	let loadedPersistedStateKey: string | null = $state(null);
@@ -1098,14 +1211,29 @@
 		}
 
 		const v = (parsed as { v: unknown }).v;
-		if (v !== 1 && v !== 2) {
+		if (v !== 1 && v !== 2 && v !== 3) {
 			hasSettledPersistedStateLoad = true;
 			return;
 		}
 
-		let typed: PersistedStateV2;
-		if (v === 2) {
-			typed = parsed as PersistedStateV2;
+		let typed: PersistedStateV3;
+		if (v === 3) {
+			typed = parsed as PersistedStateV3;
+		} else if (v === 2) {
+			const legacy2 = parsed as PersistedStateV2Legacy;
+			typed = {
+				v: 3,
+				size: legacy2.size,
+				historyNodes: legacy2.historyNodes,
+				historyRootId: legacy2.historyRootId,
+				historyNextId: legacy2.historyNextId,
+				realCursorId: legacy2.realCursorId,
+				clockSettings: defaultClockSettings,
+				clockStarted: false,
+				clockPaused: false,
+				clockRemainingMsP1: defaultClockSettings.totalMs,
+				clockRemainingMsP2: defaultClockSettings.totalMs,
+			};
 		} else {
 			const legacy = parsed as PersistedStateV1Legacy;
 			if (
@@ -1116,12 +1244,17 @@
 				return;
 			}
 			typed = {
-				v: 2,
+				v: 3,
 				size: legacy.size,
 				historyNodes: legacy.historyNodes,
 				historyRootId: legacy.historyRootId,
 				historyNextId: legacy.historyNextId,
 				realCursorId: legacy.realCursorId,
+				clockSettings: defaultClockSettings,
+				clockStarted: false,
+				clockPaused: false,
+				clockRemainingMsP1: defaultClockSettings.totalMs,
+				clockRemainingMsP2: defaultClockSettings.totalMs,
 			};
 		}
 		if (!isValidBoardSize(typed.size)) {
@@ -1141,6 +1274,26 @@
 			return;
 		}
 		if (!isNodeId(typed.realCursorId)) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (
+			typeof typed.clockSettings !== "object" ||
+			typed.clockSettings === null ||
+			!isFiniteNumber(typed.clockSettings.totalMs) ||
+			!isFiniteNumber(typed.clockSettings.gainMs) ||
+			typed.clockSettings.totalMs < 0 ||
+			typed.clockSettings.gainMs < 0
+		) {
+			hasSettledPersistedStateLoad = true;
+			return;
+		}
+		if (
+			typeof typed.clockStarted !== "boolean" ||
+			typeof typed.clockPaused !== "boolean" ||
+			!isFiniteNumber(typed.clockRemainingMsP1) ||
+			!isFiniteNumber(typed.clockRemainingMsP2)
+		) {
 			hasSettledPersistedStateLoad = true;
 			return;
 		}
@@ -1176,13 +1329,26 @@
 		realCursorId = typed.realCursorId;
 		hoverKey = null;
 		lastPreviewKey = rootKey;
+		clockSettings = typed.clockSettings;
+		clockStarted = typed.clockStarted;
+		clockPaused = typed.clockPaused;
+		clockRemainingMsP1 = typed.clockRemainingMsP1;
+		clockRemainingMsP2 = typed.clockRemainingMsP2;
+		if (typed.clockStarted && !typed.clockPaused) {
+			const now = Date.now();
+			clockLastAtMs = now;
+			clockUiNowMs = now;
+		} else {
+			clockLastAtMs = null;
+			clockUiNowMs = 0;
+		}
 
 		lastPersistedGameStateJson = raw;
 		hasSettledPersistedStateLoad = true;
 	});
 
-	const persistGameStateSnapshot = (): PersistedStateV2 => ({
-		v: 2,
+	const persistGameStateSnapshot = (): PersistedStateV3 => ({
+		v: 3,
 		size,
 		historyNodes:
 			isPreviewEnabled && stagedBaseline
@@ -1200,6 +1366,12 @@
 			isPreviewEnabled && stagedBaseline
 				? stagedBaseline.realCursorId
 				: realCursorId,
+
+		clockSettings,
+		clockStarted,
+		clockPaused,
+		clockRemainingMsP1,
+		clockRemainingMsP2,
 	});
 
 	let persistGameStateTimer: number | null = null;
@@ -1222,6 +1394,10 @@
 
 	const flushPersistedGameState = (): void => {
 		clearPersistSchedule();
+
+		const atMs = Date.now();
+		settleClockTo(turnPlayer, atMs);
+		clockLastAtMs = atMs;
 
 		const key = gameStateStorageKey;
 		const snapshot = persistGameStateSnapshot();
@@ -1306,6 +1482,11 @@
 		void historyRootId;
 		void historyNextId;
 		void realCursorId;
+		void clockSettings;
+		void clockStarted;
+		void clockPaused;
+		void clockRemainingMsP1;
+		void clockRemainingMsP2;
 		schedulePersistedGameState();
 	});
 
@@ -1547,7 +1728,17 @@
 		const typed = parsed as ServerMessage;
 		switch (typed.type) {
 			case "move":
-				if (isMoveData(typed.data)) return typed;
+				if (
+					typeof typed.data === "object" &&
+					typed.data !== null &&
+					"senderId" in typed.data &&
+					"move" in typed.data &&
+					isFiniteNumber((typed.data as { senderId: unknown }).senderId) &&
+					Number.isInteger((typed.data as { senderId: unknown }).senderId) &&
+					(typed.data as { senderId: number }).senderId >= 0 &&
+					isTimedMoveData((typed.data as { move: unknown }).move)
+				)
+					return typed;
 				else return new Bad("'move' type has incorrect data");
 			case "set size":
 				if (isValidBoardSize(typed.data)) return typed;
@@ -1567,9 +1758,26 @@
 				if (typed.data === 1 || typed.data === 2) return typed;
 				else return new Bad("'assign player' type has incorrect data");
 			case "full":
+				return typed;
 			case "undo":
 			case "swap":
-				return typed;
+				if (isStampedOp(typed.data)) return typed;
+				else return new Bad(`'${typed.type}' type has incorrect data`);
+			case "clock":
+				if (
+					typeof typed.data === "object" &&
+					typed.data !== null &&
+					"senderId" in typed.data &&
+					"atMs" in typed.data &&
+					"op" in typed.data &&
+					isFiniteNumber((typed.data as { senderId: unknown }).senderId) &&
+					Number.isInteger((typed.data as { senderId: unknown }).senderId) &&
+					(typed.data as { senderId: number }).senderId >= 0 &&
+					isFiniteNumber((typed.data as { atMs: unknown }).atMs) &&
+					isClockOp((typed.data as { op: unknown }).op)
+				)
+					return typed;
+				else return new Bad("'clock' type has incorrect data");
 			case "shared preview":
 				if (isSharedPreviewServerData(typed.data)) return typed;
 				else return new Bad("'shared preview' type has incorrect data");
@@ -1637,7 +1845,32 @@
 				(msg) => {
 					switch (msg.type) {
 						case "move":
-							setRealCursor(advanceFrom(realCursorId, msg.data));
+							{
+								const prevMoveCount =
+									id === msg.data.senderId
+										? Math.max(0, realMoveCount - 1)
+										: realMoveCount;
+								const prevTurn = playerFromIndex(prevMoveCount);
+								settleClockTo(prevTurn, msg.data.move.atMs);
+
+								if (id !== msg.data.senderId)
+									setRealCursor(
+										advanceFrom(realCursorId, msg.data.move.coords),
+									);
+
+								const wasStarted = clockStarted;
+								const isStartingNow = !wasStarted && prevMoveCount === 0;
+								if (isStartingNow) clockStarted = true;
+
+								const nextTurn = playerFromIndex(prevMoveCount + 1);
+								if (!isStartingNow)
+									applyClockTurnTransition(
+										prevTurn,
+										nextTurn,
+										msg.data.move.atMs,
+									);
+								else clockLastAtMs = msg.data.move.atMs;
+							}
 							break;
 						case "set size":
 							size = msg.data;
@@ -1680,15 +1913,50 @@
 							break;
 						case "undo":
 							{
-								const parent = nodeAt(realCursorId).parent;
-								if (parent !== null) setRealCursor(parent);
+								const prevMoveCount =
+									id === msg.data.senderId ? realMoveCount + 1 : realMoveCount;
+								const prevTurn = playerFromIndex(prevMoveCount);
+								settleClockTo(prevTurn, msg.data.atMs);
+								if (id !== msg.data.senderId) {
+									const parent = nodeAt(realCursorId).parent;
+									if (parent !== null) setRealCursor(parent);
+								}
+								applyClockTurnTransition(
+									prevTurn,
+									playerFromIndex(Math.max(0, prevMoveCount - 1)),
+									msg.data.atMs,
+								);
 							}
 							break;
 						case "swap":
 							{
-								const cur = nodeAt(realCursorId);
-								if (cur.stonePly === 1 && !cur.playersSwapped)
-									setRealCursor(advanceSwapFrom(realCursorId));
+								const prevMoveCount = realMoveCount;
+								const prevTurn = playerFromIndex(prevMoveCount);
+								settleClockTo(prevTurn, msg.data.atMs);
+								if (id !== msg.data.senderId) {
+									const cur = nodeAt(realCursorId);
+									if (cur.stonePly === 1 && !cur.playersSwapped)
+										setRealCursor(advanceSwapFrom(realCursorId));
+								}
+								applyClockTurnTransition(prevTurn, prevTurn, msg.data.atMs);
+							}
+							break;
+						case "clock":
+							{
+								const prevTurn = turnPlayer;
+								settleClockTo(prevTurn, msg.data.atMs);
+								switch (msg.data.op.kind) {
+									case "pause":
+										clockPaused = msg.data.op.paused;
+										clockLastAtMs = msg.data.atMs;
+										break;
+									case "settings":
+										resetClock(msg.data.op.settings);
+										clockLastAtMs = msg.data.atMs;
+										break;
+									default:
+										ensureCoverage(msg.data.op);
+								}
 							}
 							break;
 						case "shared preview":
@@ -1772,6 +2040,19 @@
 	const undoReal = (): void => {
 		const cur = nodeAt(realCursorId);
 		if (cur.parent === null) return;
+		if (playerMode === 1) {
+			const atMs = Date.now();
+			const prevMoveCount = realMoveCount;
+			const prevTurn = playerFromIndex(prevMoveCount);
+			settleClockTo(prevTurn, atMs);
+			setRealCursor(cur.parent);
+			applyClockTurnTransition(
+				prevTurn,
+				playerFromIndex(Math.max(0, prevMoveCount - 1)),
+				atMs,
+			);
+			return;
+		}
 		setRealCursor(cur.parent);
 	};
 
@@ -1785,6 +2066,15 @@
 		const cur = nodeAt(realCursorId);
 		if (cur.stonePly !== 1) return;
 		if (cur.playersSwapped) return;
+		if (playerMode === 1) {
+			const atMs = Date.now();
+			const prevMoveCount = realMoveCount;
+			const prevTurn = playerFromIndex(prevMoveCount);
+			settleClockTo(prevTurn, atMs);
+			setRealCursor(advanceSwapFrom(realCursorId));
+			applyClockTurnTransition(prevTurn, prevTurn, atMs);
+			return;
+		}
 		setRealCursor(advanceSwapFrom(realCursorId));
 	};
 
@@ -1914,7 +2204,22 @@
 			if (mouseOverHistory) return;
 
 			if (playerMode === 1) {
+				const atMs = Date.now();
+				const prevMoveCount = realMoveCount;
+				const prevTurn = playerFromIndex(prevMoveCount);
+				settleClockTo(prevTurn, atMs);
+
 				setRealCursor(advanceFrom(realCursorId, mouseLoc));
+
+				const wasStarted = clockStarted;
+				const isStartingNow = !wasStarted && prevMoveCount === 0;
+				if (isStartingNow) {
+					clockStarted = true;
+					clockLastAtMs = atMs;
+				} else {
+					const nextTurn = playerFromIndex(prevMoveCount + 1);
+					applyClockTurnTransition(prevTurn, nextTurn, atMs);
+				}
 				return;
 			}
 
@@ -2387,6 +2692,50 @@
 				{boardShotCopyState}
 				{turnText}
 				{turnColor}
+				{clockStarted}
+				{clockPaused}
+				clockTotalMs={clockSettings.totalMs}
+				clockGainMs={clockSettings.gainMs}
+				clockRemainingMsP1={clockDisplayRemainingMsP1}
+				clockRemainingMsP2={clockDisplayRemainingMsP2}
+				clockActivePlayer={turnPlayer}
+				setClockTotalMs={(next) => {
+					const nextSettings: ClockSettings = {
+						...clockSettings,
+						totalMs: next,
+					};
+					if (playerMode === 1 || !connected) resetClock(nextSettings);
+					else
+						send(playerMode.socket, {
+							type: "clock",
+							data: { kind: "settings", settings: nextSettings },
+						});
+				}}
+				setClockGainMs={(next) => {
+					const nextSettings: ClockSettings = {
+						...clockSettings,
+						gainMs: next,
+					};
+					if (playerMode === 1 || !connected) resetClock(nextSettings);
+					else
+						send(playerMode.socket, {
+							type: "clock",
+							data: { kind: "settings", settings: nextSettings },
+						});
+				}}
+				toggleClockPaused={() => {
+					if (playerMode === 1 || !connected) {
+						const atMs = Date.now();
+						settleClockTo(turnPlayer, atMs);
+						clockPaused = !clockPaused;
+						clockLastAtMs = atMs;
+						return;
+					}
+					send(playerMode.socket, {
+						type: "clock",
+						data: { kind: "pause", paused: !clockPaused },
+					});
+				}}
 				{size}
 				movesPlayed={realMoveCount}
 				{minBoardSize}
