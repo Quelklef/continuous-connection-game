@@ -1110,6 +1110,7 @@
 		gap: 8px;
 		font-size: 10px;
 		font-weight: 600;
+		margin-left: 3px;
 		user-select: none;
 	}
 
