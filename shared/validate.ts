@@ -3,6 +3,7 @@ import type {
 	ClockOp,
 	ClockSettings,
 	ClockState,
+	StoneData,
 } from "./types.ts";
 
 export const MIN_BOARD_SIZE = 4;
@@ -26,6 +27,14 @@ export const isMoveData = (x: unknown): x is [number, number] =>
 	isFiniteNumber(x[0]) &&
 	isFiniteNumber(x[1]);
 
+export const isStoneData = (x: unknown): x is StoneData =>
+	typeof x === "object" &&
+	x !== null &&
+	"coords" in x &&
+	"theta" in x &&
+	isMoveData((x as { coords: unknown }).coords) &&
+	isFiniteNumber((x as { theta: unknown }).theta);
+
 export const isClockSettings = (x: unknown): x is ClockSettings =>
 	typeof x === "object" &&
 	x !== null &&
@@ -40,12 +49,12 @@ export const isClockSettings = (x: unknown): x is ClockSettings =>
 
 export const isTimedMoveData = (
 	x: unknown,
-): x is { coords: [number, number]; atMs: number } =>
+): x is { stone: StoneData; atMs: number } =>
 	typeof x === "object" &&
 	x !== null &&
-	"coords" in x &&
+	"stone" in x &&
 	"atMs" in x &&
-	isMoveData((x as { coords: unknown }).coords) &&
+	isStoneData((x as { stone: unknown }).stone) &&
 	isFiniteNumber((x as { atMs: unknown }).atMs);
 
 export const isTimedNullary = (x: unknown): x is { atMs: number } =>

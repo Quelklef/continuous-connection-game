@@ -1,4 +1,5 @@
 export type MoveData = [number, number];
+export type StoneData = { coords: MoveData; theta: number };
 export type Player = 1 | 2;
 export type BoardColors = { p1: string; p2: string };
 export type StableKey = string;
@@ -18,10 +19,10 @@ export type ClockState = {
 export type ClockOp =
 	| { kind: "pause"; paused: boolean }
 	| { kind: "settings"; settings: ClockSettings };
-export type TimedMoveData = { coords: MoveData; atMs: number };
+export type TimedMoveData = { stone: StoneData; atMs: number };
 export type TimedNullary = { atMs: number };
 export type SharedPreviewMove =
-	| { kind: "stone"; coords: MoveData }
+	| { kind: "stone"; stone: StoneData }
 	| { kind: "swap" };
 export type SharedPreviewOp =
 	| { kind: "presence"; active: boolean }
@@ -39,7 +40,7 @@ export type ServerMessage =
 	| { type: "clock"; data: { senderId: number; atMs: number; op: ClockOp } }
 	| { type: "shared preview"; data: { senderId: number; op: SharedPreviewOp } };
 export type InnerClientMessage =
-	| { type: "move"; data: MoveData }
+	| { type: "move"; data: StoneData }
 	| { type: "set size"; data: number }
 	| { type: "set colors"; data: BoardColors }
 	| { type: "undo" }

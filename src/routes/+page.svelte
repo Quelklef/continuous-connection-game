@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount } from "svelte";
 	import GameBoard from "$lib/GameBoard.svelte";
-	import type { MoveData } from "../../shared/types.ts";
+	import type { StoneData } from "../../shared/types.ts";
 
 	let size = $state(14);
-	let moves: MoveData[] = $state([]);
+	let moves: StoneData[] = $state([]);
 
 	let isMultiplayerEnabled = $state(false);
 	let playerMode: 1 | { socket: WebSocket } = $state(1);

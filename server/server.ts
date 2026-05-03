@@ -8,6 +8,7 @@ import type {
 import { Bad, ensureCoverage } from "../shared/lib.ts";
 import {
 	isBoardColors,
+	isStoneData,
 	isFiniteNumber,
 	isClockOp,
 	isMoveData,
@@ -37,7 +38,7 @@ const isSharedPreviewOp = (u: unknown): u is SharedPreviewOp => {
 		const mk = (m as { kind: unknown }).kind;
 		if (mk === "swap") return true;
 		if (mk === "stone")
-			return "coords" in m && isMoveData((m as { coords: unknown }).coords);
+			return "stone" in m && isStoneData((m as { stone: unknown }).stone);
 		return false;
 	};
 
@@ -88,7 +89,7 @@ const parseWs = (data: string): ClientMessage | Bad => {
 
 	switch (typedMessage.type) {
 		case "move":
-			if (isMoveData(typedMessage.data)) return parsed as ClientMessage;
+			if (isStoneData(typedMessage.data)) return parsed as ClientMessage;
 			else return new Bad("'move' type has incorrect data");
 		case "set size":
 			if (isValidBoardSize(typedMessage.data)) return parsed as ClientMessage;
@@ -184,7 +185,7 @@ wss.on("connection", (ws) => {
 									type: "move",
 									data: {
 										senderId: wsId,
-										move: { coords: message.data, atMs },
+										move: { stone: message.data, atMs },
 									},
 								};
 								allClients.forEach((client) => send(client, msg));

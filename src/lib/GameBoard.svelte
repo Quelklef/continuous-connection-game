@@ -4,7 +4,7 @@
 		ServerMessage,
 		InnerClientMessage,
 		ClockSettings,
-		MoveData,
+		StoneData,
 		Player,
 		SharedPreviewOp,
 		StableKey,
@@ -13,8 +13,8 @@
 		isBoardColors,
 		isClockOp,
 		isFiniteNumber,
-		isMoveData,
 		isTimedMoveData,
+		isStoneData,
 		isStampedOp,
 		isValidBoardSize,
 		isValidHexColor,
@@ -23,6 +23,7 @@
 	} from "../../shared/validate.ts";
 	import HistoryTree from "$lib/HistoryTree.svelte";
 	import Toolbar from "$lib/Toolbar.svelte";
+	import polygonClipping from "polygon-clipping";
 	import {
 		appendKey,
 		keyDepth,
@@ -38,7 +39,7 @@
 	} from "$lib/sharedPreview/overlay";
 	type Props = {
 		size: number;
-		moves: MoveData[];
+		moves: StoneData[];
 		playerMode?: 1 | { socket: WebSocket };
 
 		wsUrl?: string;
@@ -95,6 +96,7 @@
 	let isComponentOutlinesEnabled = $state(false);
 	let isPreviewMode = $state(false);
 	let isAltHeld = $state(false);
+	let placementTheta = $state(0);
 
 	let sharedOverlay = $state(emptyOverlayState());
 	let sharedOverlayVersion = $state(0);
@@ -105,8 +107,8 @@
 	};
 
 	type NodeId = number;
-	type HistoryMove = { kind: "stone"; coords: MoveData } | { kind: "swap" };
-	type Rect = { x0: number; y0: number; x1: number; y1: number };
+	type HistoryMove = { kind: "stone"; stone: StoneData } | { kind: "swap" };
+	type MultiPolygon = number[][][][];
 	type HistoryNode = {
 		id: NodeId;
 		parent: NodeId | null;
@@ -116,7 +118,7 @@
 		stonePly: number;
 		playersSwapped: boolean;
 		children: NodeId[];
-		cutoutRects: Rect[] | null;
+		cutoutPolys: MultiPolygon | null;
 	};
 
 	type BaselineSnapshot = {
@@ -154,7 +156,7 @@
 			stonePly: 0,
 			playersSwapped: false,
 			children: [],
-			cutoutRects: null,
+			cutoutPolys: null,
 		};
 		historyNodes = [];
 		historyNodes[0] = root;
@@ -168,85 +170,91 @@
 
 	resetHistory();
 
-	const moveMatchEpsilon = 1e-4;
-	const isSameMove = (a: MoveData, b: MoveData): boolean => {
-		return (
-			Math.abs(a[0] - b[0]) <= moveMatchEpsilon &&
-			Math.abs(a[1] - b[1]) <= moveMatchEpsilon
-		);
-	};
-
-	const stoneRectAt = (coords: MoveData): Rect => ({
-		x0: coords[0] - 1 / 2,
-		y0: coords[1] - 1 / 2,
-		x1: coords[0] + 1 / 2,
-		y1: coords[1] + 1 / 2,
-	});
-
-	const rectIntersects = (a: Rect, b: Rect): boolean =>
+	type Aabb = { x0: number; y0: number; x1: number; y1: number };
+	const aabbIntersects = (a: Aabb, b: Aabb): boolean =>
 		a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
 
-	const subtractRect = (r: Rect, cut: Rect): Rect[] => {
-		if (!rectIntersects(r, cut)) return [r];
-
-		const ix0 = Math.max(r.x0, cut.x0);
-		const iy0 = Math.max(r.y0, cut.y0);
-		const ix1 = Math.min(r.x1, cut.x1);
-		const iy1 = Math.min(r.y1, cut.y1);
-		if (ix0 >= ix1 || iy0 >= iy1) return [r];
-
-		const out: Rect[] = [];
-		if (r.y0 < iy0) out.push({ x0: r.x0, y0: r.y0, x1: r.x1, y1: iy0 });
-		if (iy1 < r.y1) out.push({ x0: r.x0, y0: iy1, x1: r.x1, y1: r.y1 });
-		if (r.x0 < ix0) out.push({ x0: r.x0, y0: iy0, x1: ix0, y1: iy1 });
-		if (ix1 < r.x1) out.push({ x0: ix1, y0: iy0, x1: r.x1, y1: iy1 });
-		return out;
+	const stoneCorners = (stone: StoneData): [number, number][] => {
+		const [cx, cy] = stone.coords;
+		const h = 1 / 2;
+		const c = Math.cos(stone.theta);
+		const s = Math.sin(stone.theta);
+		const rot = (x: number, y: number): [number, number] => [
+			cx + x * c - y * s,
+			cy + x * s + y * c,
+		];
+		return [rot(-h, -h), rot(h, -h), rot(h, h), rot(-h, h)];
 	};
 
-	const subtractRectSet = (base: Rect, cuts: Rect[]): Rect[] => {
-		let pieces: Rect[] = [base];
-		for (const c of cuts) {
-			const next: Rect[] = [];
-			for (const p of pieces) next.push(...subtractRect(p, c));
-			pieces = next;
-			if (pieces.length === 0) break;
+	const stoneAabb = (stone: StoneData): Aabb => {
+		const pts = stoneCorners(stone);
+		let x0 = pts[0]?.[0] ?? 0;
+		let y0 = pts[0]?.[1] ?? 0;
+		let x1 = x0;
+		let y1 = y0;
+		for (const [x, y] of pts) {
+			x0 = Math.min(x0, x);
+			y0 = Math.min(y0, y);
+			x1 = Math.max(x1, x);
+			y1 = Math.max(y1, y);
 		}
-		return pieces;
+		return { x0, y0, x1, y1 };
 	};
+
+	const stonePolyAt = (stone: StoneData): MultiPolygon => [
+		[stoneCorners(stone)],
+	];
 
 	const computeStoneCutoutAt = (
 		parentId: NodeId,
-		stoneCoords: MoveData,
+		stone: StoneData,
 		stoneIndex: number,
-	): Rect[] => {
-		const base = stoneRectAt(stoneCoords);
+	): MultiPolygon => {
+		const subject = stonePolyAt(stone);
+		const subjectAabb = stoneAabb(stone);
 		const player = playerFromIndex(stoneIndex);
 
-		const cuts: Rect[] = [];
+		const cuts: MultiPolygon[] = [];
 		let cur: NodeId | null = parentId;
 		while (cur !== null) {
 			const n = nodeAt(cur);
 			if (n.move?.kind === "stone") {
 				const idx = n.stonePly - 1;
 				if (idx >= 0 && playerFromIndex(idx) !== player) {
-					const r = stoneRectAt(n.move.coords);
-					if (rectIntersects(r, base)) cuts.push(r);
+					const otherStone = n.move.stone;
+					const otherAabb = stoneAabb(otherStone);
+					if (aabbIntersects(subjectAabb, otherAabb))
+						cuts.push(stonePolyAt(otherStone));
 				}
 			}
 			cur = n.parent;
 		}
 
-		return subtractRectSet(base, cuts);
+		if (cuts.length === 0) return subject;
+
+		let ok: boolean;
+		let result: MultiPolygon | null = null;
+		let err: unknown;
+		try {
+			result = (
+				polygonClipping as unknown as {
+					difference: (a: MultiPolygon, ...b: MultiPolygon[]) => MultiPolygon;
+				}
+			).difference(subject, ...cuts);
+			ok = true;
+		} catch (e) {
+			err = e;
+			ok = false;
+		}
+		if (!ok || !result) {
+			console.warn("failed to compute stone cutout", err);
+			return subject;
+		}
+		return result;
 	};
 
-	const advanceFrom = (fromId: NodeId, move: MoveData): NodeId => {
+	const advanceFrom = (fromId: NodeId, stone: StoneData): NodeId => {
 		const from = nodeAt(fromId);
-		const existing = from.children.find((childId) => {
-			const child = nodeAt(childId);
-			if (child.move?.kind !== "stone") return false;
-			return isSameMove(child.move.coords, move);
-		});
-		if (existing !== undefined) return existing;
 
 		if (isPreviewEnabled && !isSharedPreviewEditEnabled)
 			hasStagedBaselineChanges = true;
@@ -257,13 +265,13 @@
 		const next: HistoryNode = {
 			id: nextId,
 			parent: fromId,
-			move: { kind: "stone", coords: move },
+			move: { kind: "stone", stone },
 			kind: "stone",
 			ply: from.ply + 1,
 			stonePly: from.stonePly + 1,
 			playersSwapped: from.playersSwapped,
 			children: [],
-			cutoutRects: computeStoneCutoutAt(fromId, move, stoneIndex),
+			cutoutPolys: computeStoneCutoutAt(fromId, stone, stoneIndex),
 		};
 
 		const updatedFrom: HistoryNode = {
@@ -300,7 +308,7 @@
 			stonePly: from.stonePly,
 			playersSwapped: true,
 			children: [],
-			cutoutRects: null,
+			cutoutPolys: null,
 		};
 
 		const updatedFrom: HistoryNode = {
@@ -315,12 +323,12 @@
 		return nextId;
 	};
 
-	const moveListAt = (cursorId: NodeId): MoveData[] => {
+	const moveListAt = (cursorId: NodeId): StoneData[] => {
 		let cur = cursorId;
-		const out: MoveData[] = [];
+		const out: StoneData[] = [];
 		while (cur !== historyRootId) {
 			const n = nodeAt(cur);
-			if (n.move?.kind === "stone") out.push(n.move.coords);
+			if (n.move?.kind === "stone") out.push(n.move.stone);
 			if (n.parent === null) break;
 			cur = n.parent;
 		}
@@ -388,12 +396,12 @@
 		return overlayGet(sharedOverlay, key)?.move ?? null;
 	};
 
-	const stoneMovesAtKey = (key: StableKey): MoveData[] => {
+	const stoneMovesAtKey = (key: StableKey): StoneData[] => {
 		let cur: StableKey = key;
-		const out: MoveData[] = [];
+		const out: StoneData[] = [];
 		while (cur !== rootKey) {
 			const move = moveForKey(cur);
-			if (move?.kind === "stone") out.push(move.coords);
+			if (move?.kind === "stone") out.push(move.stone);
 			const parent = parentKeyOf(cur);
 			if (!parent) break;
 			cur = parent;
@@ -1162,8 +1170,8 @@
 		switch (kind) {
 			case "stone":
 				return (
-					"coords" in u &&
-					isMoveData((u as { kind: "stone"; coords: unknown }).coords)
+					"stone" in u &&
+					isStoneData((u as { kind: "stone"; stone: unknown }).stone)
 				);
 			case "swap":
 				return true;
@@ -1172,17 +1180,22 @@
 		}
 	};
 
-	const isRect = (u: unknown): u is Rect =>
-		typeof u === "object" &&
-		u !== null &&
-		"x0" in u &&
-		"y0" in u &&
-		"x1" in u &&
-		"y1" in u &&
-		isFiniteNumber((u as Rect).x0) &&
-		isFiniteNumber((u as Rect).y0) &&
-		isFiniteNumber((u as Rect).x1) &&
-		isFiniteNumber((u as Rect).y1);
+	const isPoint = (u: unknown): u is [number, number] =>
+		Array.isArray(u) &&
+		u.length === 2 &&
+		isFiniteNumber(u[0]) &&
+		isFiniteNumber(u[1]);
+
+	const isMultiPolygon = (u: unknown): u is MultiPolygon =>
+		Array.isArray(u) &&
+		u.every(
+			(poly) =>
+				Array.isArray(poly) &&
+				poly.every(
+					(ring) =>
+						Array.isArray(ring) && ring.length >= 3 && ring.every(isPoint),
+				),
+		);
 
 	const isHistoryNode = (u: unknown): u is HistoryNode => {
 		if (typeof u !== "object" || u === null) return false;
@@ -1207,10 +1220,9 @@
 		if (!("children" in u) || !Array.isArray((u as HistoryNode).children))
 			return false;
 		if (!(u as HistoryNode).children.every(isNodeId)) return false;
-		if ("cutoutRects" in u) {
-			const cr = (u as { cutoutRects: unknown }).cutoutRects;
-			if (cr !== null && (!Array.isArray(cr) || !cr.every(isRect)))
-				return false;
+		if ("cutoutPolys" in u) {
+			const cr = (u as { cutoutPolys: unknown }).cutoutPolys;
+			if (cr !== null && !isMultiPolygon(cr)) return false;
 		}
 		return true;
 	};
@@ -1436,8 +1448,8 @@
 
 		const normalizedNodes: (HistoryNode | null)[] = nodes.map((n) => {
 			if (!n) return null;
-			if ("cutoutRects" in n) return n as HistoryNode;
-			return { ...(n as HistoryNode), cutoutRects: null };
+			if ("cutoutPolys" in n) return n as HistoryNode;
+			return { ...(n as HistoryNode), cutoutPolys: null };
 		});
 
 		historyNodes = normalizedNodes;
@@ -1445,13 +1457,13 @@
 		const withCutouts: (HistoryNode | null)[] = normalizedNodes.map((n) => {
 			if (!n) return null;
 			if (n.move?.kind !== "stone") return n;
-			if (n.cutoutRects) return n;
+			if (n.cutoutPolys) return n;
 			if (n.parent === null) return n;
 			const stoneIndex = n.stonePly - 1;
 			if (stoneIndex < 0) return n;
 			return {
 				...n,
-				cutoutRects: computeStoneCutoutAt(n.parent, n.move.coords, stoneIndex),
+				cutoutPolys: computeStoneCutoutAt(n.parent, n.move.stone, stoneIndex),
 			};
 		});
 		historyNodes = withCutouts;
@@ -1724,7 +1736,7 @@
 				case "stone":
 					idByKey[appendKey(parentKey, node.move)] = advanceFrom(
 						parentId,
-						node.move.coords,
+						node.move.stone,
 					);
 					break;
 				case "swap":
@@ -1804,7 +1816,7 @@
 			const mk = (m as { kind: unknown }).kind;
 			if (mk === "swap") return true;
 			if (mk === "stone")
-				return "coords" in m && isMoveData((m as { coords: unknown }).coords);
+				return "stone" in m && isStoneData((m as { stone: unknown }).stone);
 			return false;
 		};
 
@@ -1985,9 +1997,7 @@
 								settleClockTo(prevTurn, msg.data.move.atMs);
 
 								if (id !== msg.data.senderId)
-									setRealCursor(
-										advanceFrom(realCursorId, msg.data.move.coords),
-									);
+									setRealCursor(advanceFrom(realCursorId, msg.data.move.stone));
 
 								const wasStarted = clockStarted;
 								const isStartingNow = !wasStarted && prevMoveCount === 0;
@@ -2276,9 +2286,7 @@
 			});
 		}, 2200);
 	});
-	let movesForRender = $derived(
-		displayMoves.map((coords, i) => ({ coords, i })),
-	);
+	let movesForRender = $derived(displayMoves.map((stone, i) => ({ stone, i })));
 	let movesForStones = $derived(movesForRender.toReversed());
 	let componentOutlineHalfWidth = $derived(
 		svgPixels && svgPixels.w > 0
@@ -2289,50 +2297,81 @@
 		Math.max(componentOutlineHalfWidth * 8, viewBox.w / 200),
 	);
 
-	const computeCutoutsForMoveSeq = (
-		coordsSeq: MoveData[],
-	): { p1: Rect[]; p2: Rect[] } => {
-		const occludersP1: Rect[] = [];
-		const occludersP2: Rect[] = [];
-		const outP1: Rect[] = [];
-		const outP2: Rect[] = [];
+	const multiPolygonToPath = (mp: MultiPolygon): string => {
+		let d = "";
+		for (const poly of mp) {
+			for (const ring of poly) {
+				if (ring.length === 0) continue;
+				d += `M ${ring[0]![0]} ${ring[0]![1]}`;
+				for (let i = 1; i < ring.length; i++)
+					d += ` L ${ring[i]![0]} ${ring[i]![1]}`;
+				d += " Z ";
+			}
+		}
+		return d.trim();
+	};
 
-		for (let i = 0; i < coordsSeq.length; i++) {
-			const coords = coordsSeq[i];
-			if (!coords) continue;
-			const r = stoneRectAt(coords);
+	const computeCutoutPathsForSeq = (
+		seq: StoneData[],
+	): { p1: string[]; p2: string[] } => {
+		const occludersP1: StoneData[] = [];
+		const occludersP2: StoneData[] = [];
+		const outP1: string[] = [];
+		const outP2: string[] = [];
+
+		for (let i = 0; i < seq.length; i++) {
+			const stone = seq[i];
+			if (!stone) continue;
 			const player = playerFromIndex(i);
 			const cuts = player === 1 ? occludersP2 : occludersP1;
 
-			const overlappingCuts: Rect[] = [];
-			for (const c of cuts) if (rectIntersects(c, r)) overlappingCuts.push(c);
+			const subjectAabb = stoneAabb(stone);
+			const cutPolys: MultiPolygon[] = [];
+			for (const c of cuts)
+				if (aabbIntersects(subjectAabb, stoneAabb(c)))
+					cutPolys.push(stonePolyAt(c));
 
-			const pieces = subtractRectSet(r, overlappingCuts);
-			if (player === 1) outP1.push(...pieces);
-			else outP2.push(...pieces);
+			let mp: MultiPolygon;
+			if (cutPolys.length === 0) mp = stonePolyAt(stone);
+			else
+				mp = (
+					polygonClipping as unknown as {
+						difference: (a: MultiPolygon, ...b: MultiPolygon[]) => MultiPolygon;
+					}
+				).difference(stonePolyAt(stone), ...cutPolys);
 
-			if (player === 1) occludersP1.push(r);
-			else occludersP2.push(r);
+			if (mp.length > 0) {
+				const path = multiPolygonToPath(mp);
+				if (path) {
+					if (player === 1) outP1.push(path);
+					else outP2.push(path);
+				}
+			}
+
+			if (player === 1) occludersP1.push(stone);
+			else occludersP2.push(stone);
 		}
 
 		return { p1: outP1, p2: outP2 };
 	};
 
-	let componentCutoutRects = $derived(
+	let componentCutoutPaths = $derived(
 		(() => {
-			if (isPreviewEnabled) return computeCutoutsForMoveSeq(displayMoves);
+			if (isPreviewEnabled) return computeCutoutPathsForSeq(displayMoves);
 
-			const p1: Rect[] = [];
-			const p2: Rect[] = [];
+			const p1: string[] = [];
+			const p2: string[] = [];
 			for (const id of realStoneIds) {
 				const n = nodeAt(id);
 				if (n.move?.kind !== "stone") continue;
-				const cut = n.cutoutRects;
+				const cut = n.cutoutPolys;
 				if (!cut || cut.length === 0) continue;
 				const idx = n.stonePly - 1;
 				if (idx < 0) continue;
-				if (playerFromIndex(idx) === 1) p1.push(...cut);
-				else p2.push(...cut);
+				const path = multiPolygonToPath(cut);
+				if (!path) continue;
+				if (playerFromIndex(idx) === 1) p1.push(path);
+				else p2.push(path);
 			}
 			return { p1, p2 };
 		})(),
@@ -2340,6 +2379,19 @@
 
 	const handleWheel = (e: WheelEvent): void => {
 		updateMouseLocImmediately(e);
+
+		if (e.altKey && svgPixels && svgPixels.w > 0 && viewBox.w > 0) {
+			const step = Math.sign(e.deltaY);
+			if (step === 0) return;
+
+			const arcPx = e.shiftKey ? 4 : 14;
+			const pxPerUnit = svgPixels.w / viewBox.w;
+			const cornerRadiusPx = (Math.SQRT2 / 2) * pxPerUnit;
+			if (cornerRadiusPx <= 0) return;
+			const dTheta = arcPx / cornerRadiusPx;
+			placementTheta += step * dTheta;
+			return;
+		}
 
 		const scale = Math.pow(1.0015, e.deltaY);
 		const nextW = viewBox.w * scale;
@@ -2389,7 +2441,12 @@
 				const prevTurn = playerFromIndex(prevMoveCount);
 				settleClockTo(prevTurn, atMs);
 
-				setRealCursor(advanceFrom(realCursorId, mouseLoc));
+				setRealCursor(
+					advanceFrom(realCursorId, {
+						coords: mouseLoc,
+						theta: placementTheta,
+					}),
+				);
 
 				const wasStarted = clockStarted;
 				const isStartingNow = !wasStarted && prevMoveCount === 0;
@@ -2410,7 +2467,10 @@
 					const op: SharedPreviewOp = {
 						kind: "add",
 						parentKey: activeKey,
-						move: { kind: "stone", coords: mouseLoc },
+						move: {
+							kind: "stone",
+							stone: { coords: mouseLoc, theta: placementTheta },
+						},
 					};
 					const { key: nextKey, changed } = overlayUpsertAdd(
 						sharedOverlay,
@@ -2424,7 +2484,10 @@
 					}
 				} else {
 					const fromId = baselineIdByKey[activeKey] ?? realCursorId;
-					const nextId = advanceFrom(fromId, mouseLoc);
+					const nextId = advanceFrom(fromId, {
+						coords: mouseLoc,
+						theta: placementTheta,
+					});
 					hasStagedBaselineChanges = true;
 					setActiveKey(baselineKeyById[nextId] ?? activeKey);
 				}
@@ -2432,8 +2495,16 @@
 			}
 
 			if (myTurn && connected) {
-				setRealCursor(advanceFrom(realCursorId, mouseLoc));
-				send(playerMode.socket, { type: "move", data: mouseLoc });
+				setRealCursor(
+					advanceFrom(realCursorId, {
+						coords: mouseLoc,
+						theta: placementTheta,
+					}),
+				);
+				send(playerMode.socket, {
+					type: "move",
+					data: { coords: mouseLoc, theta: placementTheta },
+				});
 			}
 		}
 	};
@@ -2711,8 +2782,8 @@
 				{#if isShiftHeld}
 					{#each movesForRender as move (move.i)}
 						<rect
-							x={move.coords[0] - 3 / 2}
-							y={move.coords[1] - 3 / 2}
+							x={move.stone.coords[0] - 3 / 2}
+							y={move.stone.coords[1] - 3 / 2}
 							width="3"
 							height="3"
 							fill={playerColor(playerFromIndex(move.i))}
@@ -2722,14 +2793,16 @@
 				{/if}
 
 				{#snippet shape(
-					coords: [number, number],
+					stone: StoneData,
 					index: number,
 					isHighlighted: boolean,
 					opacity: number,
 				)}
+					{@const cx = stone.coords[0]}
+					{@const cy = stone.coords[1]}
 					<rect
-						x={coords[0] - 1 / 2}
-						y={coords[1] - 1 / 2}
+						x={cx - 1 / 2}
+						y={cy - 1 / 2}
 						width="1"
 						height="1"
 						fill={playerColor(playerFromIndex(index))}
@@ -2737,24 +2810,30 @@
 						stroke={isHighlighted ? "black" : "none"}
 						stroke-width={isHighlighted ? 2 : 0}
 						vector-effect="non-scaling-stroke"
+						transform={`rotate(${(stone.theta * 180) / Math.PI} ${cx} ${cy})`}
 					></rect>
 				{/snippet}
 
 				{#if isPreviewStoneShown}
-					{@render shape(mouseLoc, displayMoveCount, false, 0.75)}
+					{@render shape(
+						{ coords: mouseLoc, theta: placementTheta },
+						displayMoveCount,
+						false,
+						0.75,
+					)}
 				{/if}
 
 				{#each movesForStones as move (move.i)}
-					{@render shape(move.coords, move.i, false, 1)}
+					{@render shape(move.stone, move.i, false, 1)}
 				{/each}
 
 				{#if isShiftHeld && displayMoveCount > 0 && svgPixels && svgPixels.w > 0}
-					{@const latestCoords = displayMoves[displayMoveCount - 1]}
+					{@const latestStone = displayMoves[displayMoveCount - 1]}
 					{@const unitsPerPx = viewBox.w / svgPixels.w}
 					{@const t = unitsPerPx * 2}
-					{#if latestCoords}
+					{#if latestStone}
 						<path
-							d={`M ${latestCoords[0] - 1 / 2 - t} ${latestCoords[1] - 1 / 2 - t} h ${1 + 2 * t} v ${1 + 2 * t} h ${-(1 + 2 * t)} Z M ${latestCoords[0] - 1 / 2} ${latestCoords[1] - 1 / 2} h 1 v 1 h -1 Z`}
+							d={`M ${latestStone.coords[0] - 1 / 2 - t} ${latestStone.coords[1] - 1 / 2 - t} h ${1 + 2 * t} v ${1 + 2 * t} h ${-(1 + 2 * t)} Z M ${latestStone.coords[0] - 1 / 2} ${latestStone.coords[1] - 1 / 2} h 1 v 1 h -1 Z`}
 							fill="rgba(0,0,0,0.95)"
 							fill-rule="evenodd"
 							style:pointer-events="none"
@@ -2795,25 +2874,13 @@
 
 					<g pointer-events="none">
 						<g filter="url(#componentOutlineFilter)">
-							{#each componentCutoutRects.p1 as r (r)}
-								<rect
-									x={r.x0}
-									y={r.y0}
-									width={r.x1 - r.x0}
-									height={r.y1 - r.y0}
-									fill="black"
-								></rect>
+							{#each componentCutoutPaths.p1 as d (d)}
+								<path {d} fill="black" fill-rule="evenodd"></path>
 							{/each}
 						</g>
 						<g filter="url(#componentOutlineFilter)">
-							{#each componentCutoutRects.p2 as r (r)}
-								<rect
-									x={r.x0}
-									y={r.y0}
-									width={r.x1 - r.x0}
-									height={r.y1 - r.y0}
-									fill="black"
-								></rect>
+							{#each componentCutoutPaths.p2 as d (d)}
+								<path {d} fill="black" fill-rule="evenodd"></path>
 							{/each}
 						</g>
 					</g>
@@ -2823,8 +2890,8 @@
 					{#each movesForRender as move (move.i)}
 						{@const indexTextStyle = stoneIndexTextStyle(move.i)}
 						<text
-							x={move.coords[0]}
-							y={move.coords[1]}
+							x={move.stone.coords[0]}
+							y={move.stone.coords[1]}
 							text-anchor="middle"
 							dominant-baseline="central"
 							font-size="0.3"

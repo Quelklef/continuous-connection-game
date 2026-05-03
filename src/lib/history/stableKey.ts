@@ -1,19 +1,17 @@
 export type StableKey = string;
 
 export type KeyMove =
-	| { kind: "stone"; coords: [number, number] }
+	| { kind: "stone"; stone: { coords: [number, number]; theta: number } }
 	| { kind: "swap" };
 
 export const rootKey: StableKey = "r";
 
-const coordScale = 10_000;
-const quantize = (coord: number): number => Math.round(coord * coordScale);
-
 export const appendKey = (parentKey: StableKey, move: KeyMove): StableKey => {
 	switch (move.kind) {
 		case "stone": {
-			const [x, y] = move.coords;
-			const seg = `s${quantize(x)},${quantize(y)}`;
+			const [x, y] = move.stone.coords;
+			const t = move.stone.theta;
+			const seg = `s${x},${y},${t}`;
 			return `${parentKey}|${seg}`;
 		}
 		case "swap":

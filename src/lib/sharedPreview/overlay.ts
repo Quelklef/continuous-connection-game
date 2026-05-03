@@ -1,9 +1,9 @@
-import type { MoveData } from "../../../shared/types.ts";
+import type { StoneData } from "../../../shared/types.ts";
 import type { StableKey } from "../history/stableKey";
 import { appendKey, parentKeyOf } from "../history/stableKey";
 
 export type OverlayMove =
-	| { kind: "stone"; coords: MoveData }
+	| { kind: "stone"; stone: StoneData }
 	| { kind: "swap" };
 
 export type OverlayNode = {
