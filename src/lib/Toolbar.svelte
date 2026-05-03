@@ -1107,7 +1107,7 @@
 	.sectionEnable {
 		display: inline-flex;
 		align-items: center;
-		gap: 8px;
+		gap: 6px;
 		font-size: 10px;
 		font-weight: 600;
 		margin-left: 3px;
