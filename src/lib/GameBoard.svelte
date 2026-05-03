@@ -2381,6 +2381,7 @@
 		updateMouseLocImmediately(e);
 
 		if (e.altKey && svgPixels && svgPixels.w > 0 && viewBox.w > 0) {
+			e.preventDefault();
 			const step = Math.sign(e.deltaY);
 			if (step === 0) return;
 

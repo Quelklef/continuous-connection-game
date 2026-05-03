@@ -657,8 +657,12 @@
 			<div class="shortcutList">
 				<div class="keycap">shift</div>
 				<div>display extra board info</div>
-				<div class="keycap">scroll wheel</div>
+				<div class="keycap">scroll</div>
 				<div>zoom</div>
+				<div class="keycap">alt+scroll</div>
+				<div>rotate stone</div>
+				<div class="keycap">alt+shift+scroll</div>
+				<div>rotate stone (fine)</div>
 				<div class="keycap">right-drag</div>
 				<div>pan</div>
 				{#if isMultiplayerEnabled}
