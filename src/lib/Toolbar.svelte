@@ -1137,6 +1137,7 @@
 	}
 
 	.timerInput {
+		width: 72px;
 		height: 30px;
 		padding: 0 8px;
 		border-radius: 10px;
