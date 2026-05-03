@@ -2620,8 +2620,10 @@
 								<feMergeNode in="o" />
 							</feMerge>
 						</filter>
+					</defs>
 
-						<mask id="p1ComponentMask" maskUnits="userSpaceOnUse">
+					<g pointer-events="none">
+						<g filter="url(#componentOutlineFilter)">
 							{#each movesForRender as move (move.i)}
 								{#if playerFromIndex(move.i) === 1}
 									<rect
@@ -2629,12 +2631,12 @@
 										y={move.coords[1] - 1 / 2}
 										width="1"
 										height="1"
-										fill="white"
+										fill="black"
 									></rect>
 								{/if}
 							{/each}
-						</mask>
-						<mask id="p2ComponentMask" maskUnits="userSpaceOnUse">
+						</g>
+						<g filter="url(#componentOutlineFilter)">
 							{#each movesForRender as move (move.i)}
 								{#if playerFromIndex(move.i) === 2}
 									<rect
@@ -2642,32 +2644,11 @@
 										y={move.coords[1] - 1 / 2}
 										width="1"
 										height="1"
-										fill="white"
+										fill="black"
 									></rect>
 								{/if}
 							{/each}
-						</mask>
-					</defs>
-
-					<g pointer-events="none">
-						<rect
-							x="0"
-							y="0"
-							width={size}
-							height={size}
-							fill="black"
-							mask="url(#p1ComponentMask)"
-							filter="url(#componentOutlineFilter)"
-						></rect>
-						<rect
-							x="0"
-							y="0"
-							width={size}
-							height={size}
-							fill="black"
-							mask="url(#p2ComponentMask)"
-							filter="url(#componentOutlineFilter)"
-						></rect>
+						</g>
 					</g>
 				{/if}
 
