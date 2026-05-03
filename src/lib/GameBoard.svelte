@@ -106,6 +106,7 @@
 
 	type NodeId = number;
 	type HistoryMove = { kind: "stone"; coords: MoveData } | { kind: "swap" };
+	type Rect = { x0: number; y0: number; x1: number; y1: number };
 	type HistoryNode = {
 		id: NodeId;
 		parent: NodeId | null;
@@ -115,6 +116,7 @@
 		stonePly: number;
 		playersSwapped: boolean;
 		children: NodeId[];
+		cutoutRects: Rect[] | null;
 	};
 
 	type BaselineSnapshot = {
@@ -152,6 +154,7 @@
 			stonePly: 0,
 			playersSwapped: false,
 			children: [],
+			cutoutRects: null,
 		};
 		historyNodes = [];
 		historyNodes[0] = root;
@@ -173,6 +176,69 @@
 		);
 	};
 
+	const stoneRectAt = (coords: MoveData): Rect => ({
+		x0: coords[0] - 1 / 2,
+		y0: coords[1] - 1 / 2,
+		x1: coords[0] + 1 / 2,
+		y1: coords[1] + 1 / 2,
+	});
+
+	const rectIntersects = (a: Rect, b: Rect): boolean =>
+		a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+
+	const subtractRect = (r: Rect, cut: Rect): Rect[] => {
+		if (!rectIntersects(r, cut)) return [r];
+
+		const ix0 = Math.max(r.x0, cut.x0);
+		const iy0 = Math.max(r.y0, cut.y0);
+		const ix1 = Math.min(r.x1, cut.x1);
+		const iy1 = Math.min(r.y1, cut.y1);
+		if (ix0 >= ix1 || iy0 >= iy1) return [r];
+
+		const out: Rect[] = [];
+		if (r.y0 < iy0) out.push({ x0: r.x0, y0: r.y0, x1: r.x1, y1: iy0 });
+		if (iy1 < r.y1) out.push({ x0: r.x0, y0: iy1, x1: r.x1, y1: r.y1 });
+		if (r.x0 < ix0) out.push({ x0: r.x0, y0: iy0, x1: ix0, y1: iy1 });
+		if (ix1 < r.x1) out.push({ x0: ix1, y0: iy0, x1: r.x1, y1: iy1 });
+		return out;
+	};
+
+	const subtractRectSet = (base: Rect, cuts: Rect[]): Rect[] => {
+		let pieces: Rect[] = [base];
+		for (const c of cuts) {
+			const next: Rect[] = [];
+			for (const p of pieces) next.push(...subtractRect(p, c));
+			pieces = next;
+			if (pieces.length === 0) break;
+		}
+		return pieces;
+	};
+
+	const computeStoneCutoutAt = (
+		parentId: NodeId,
+		stoneCoords: MoveData,
+		stoneIndex: number,
+	): Rect[] => {
+		const base = stoneRectAt(stoneCoords);
+		const player = playerFromIndex(stoneIndex);
+
+		const cuts: Rect[] = [];
+		let cur: NodeId | null = parentId;
+		while (cur !== null) {
+			const n = nodeAt(cur);
+			if (n.move?.kind === "stone") {
+				const idx = n.stonePly - 1;
+				if (idx >= 0 && playerFromIndex(idx) !== player) {
+					const r = stoneRectAt(n.move.coords);
+					if (rectIntersects(r, base)) cuts.push(r);
+				}
+			}
+			cur = n.parent;
+		}
+
+		return subtractRectSet(base, cuts);
+	};
+
 	const advanceFrom = (fromId: NodeId, move: MoveData): NodeId => {
 		const from = nodeAt(fromId);
 		const existing = from.children.find((childId) => {
@@ -187,6 +253,7 @@
 
 		const nextId = historyNextId;
 		historyNextId += 1;
+		const stoneIndex = from.stonePly;
 		const next: HistoryNode = {
 			id: nextId,
 			parent: fromId,
@@ -196,6 +263,7 @@
 			stonePly: from.stonePly + 1,
 			playersSwapped: from.playersSwapped,
 			children: [],
+			cutoutRects: computeStoneCutoutAt(fromId, move, stoneIndex),
 		};
 
 		const updatedFrom: HistoryNode = {
@@ -232,6 +300,7 @@
 			stonePly: from.stonePly,
 			playersSwapped: true,
 			children: [],
+			cutoutRects: null,
 		};
 
 		const updatedFrom: HistoryNode = {
@@ -252,6 +321,19 @@
 		while (cur !== historyRootId) {
 			const n = nodeAt(cur);
 			if (n.move?.kind === "stone") out.push(n.move.coords);
+			if (n.parent === null) break;
+			cur = n.parent;
+		}
+		out.reverse();
+		return out;
+	};
+
+	const stoneIdsAt = (cursorId: NodeId): NodeId[] => {
+		let cur = cursorId;
+		const out: NodeId[] = [];
+		while (cur !== historyRootId) {
+			const n = nodeAt(cur);
+			if (n.move?.kind === "stone") out.push(cur);
 			if (n.parent === null) break;
 			cur = n.parent;
 		}
@@ -407,6 +489,8 @@
 	$effect(() => {
 		moves = moveListAt(realCursorId);
 	});
+
+	let realStoneIds = $derived(stoneIdsAt(realCursorId));
 
 	$effect(() => {
 		if (!isPreviewEnabled) return;
@@ -1088,6 +1172,18 @@
 		}
 	};
 
+	const isRect = (u: unknown): u is Rect =>
+		typeof u === "object" &&
+		u !== null &&
+		"x0" in u &&
+		"y0" in u &&
+		"x1" in u &&
+		"y1" in u &&
+		isFiniteNumber((u as Rect).x0) &&
+		isFiniteNumber((u as Rect).y0) &&
+		isFiniteNumber((u as Rect).x1) &&
+		isFiniteNumber((u as Rect).y1);
+
 	const isHistoryNode = (u: unknown): u is HistoryNode => {
 		if (typeof u !== "object" || u === null) return false;
 		if (!("id" in u) || !isNodeId((u as HistoryNode).id)) return false;
@@ -1111,6 +1207,11 @@
 		if (!("children" in u) || !Array.isArray((u as HistoryNode).children))
 			return false;
 		if (!(u as HistoryNode).children.every(isNodeId)) return false;
+		if ("cutoutRects" in u) {
+			const cr = (u as { cutoutRects: unknown }).cutoutRects;
+			if (cr !== null && (!Array.isArray(cr) || !cr.every(isRect)))
+				return false;
+		}
 		return true;
 	};
 
@@ -1332,7 +1433,28 @@
 		}
 
 		size = typed.size;
-		historyNodes = nodes;
+
+		const normalizedNodes: (HistoryNode | null)[] = nodes.map((n) => {
+			if (!n) return null;
+			if ("cutoutRects" in n) return n as HistoryNode;
+			return { ...(n as HistoryNode), cutoutRects: null };
+		});
+
+		historyNodes = normalizedNodes;
+
+		const withCutouts: (HistoryNode | null)[] = normalizedNodes.map((n) => {
+			if (!n) return null;
+			if (n.move?.kind !== "stone") return n;
+			if (n.cutoutRects) return n;
+			if (n.parent === null) return n;
+			const stoneIndex = n.stonePly - 1;
+			if (stoneIndex < 0) return n;
+			return {
+				...n,
+				cutoutRects: computeStoneCutoutAt(n.parent, n.move.coords, stoneIndex),
+			};
+		});
+		historyNodes = withCutouts;
 		historyRootId = typed.historyRootId;
 		historyNextId = typed.historyNextId;
 		realCursorId = typed.realCursorId;
@@ -2167,6 +2289,55 @@
 		Math.max(componentOutlineHalfWidth * 8, viewBox.w / 200),
 	);
 
+	const computeCutoutsForMoveSeq = (
+		coordsSeq: MoveData[],
+	): { p1: Rect[]; p2: Rect[] } => {
+		const occludersP1: Rect[] = [];
+		const occludersP2: Rect[] = [];
+		const outP1: Rect[] = [];
+		const outP2: Rect[] = [];
+
+		for (let i = 0; i < coordsSeq.length; i++) {
+			const coords = coordsSeq[i];
+			if (!coords) continue;
+			const r = stoneRectAt(coords);
+			const player = playerFromIndex(i);
+			const cuts = player === 1 ? occludersP2 : occludersP1;
+
+			const overlappingCuts: Rect[] = [];
+			for (const c of cuts) if (rectIntersects(c, r)) overlappingCuts.push(c);
+
+			const pieces = subtractRectSet(r, overlappingCuts);
+			if (player === 1) outP1.push(...pieces);
+			else outP2.push(...pieces);
+
+			if (player === 1) occludersP1.push(r);
+			else occludersP2.push(r);
+		}
+
+		return { p1: outP1, p2: outP2 };
+	};
+
+	let componentCutoutRects = $derived(
+		(() => {
+			if (isPreviewEnabled) return computeCutoutsForMoveSeq(displayMoves);
+
+			const p1: Rect[] = [];
+			const p2: Rect[] = [];
+			for (const id of realStoneIds) {
+				const n = nodeAt(id);
+				if (n.move?.kind !== "stone") continue;
+				const cut = n.cutoutRects;
+				if (!cut || cut.length === 0) continue;
+				const idx = n.stonePly - 1;
+				if (idx < 0) continue;
+				if (playerFromIndex(idx) === 1) p1.push(...cut);
+				else p2.push(...cut);
+			}
+			return { p1, p2 };
+		})(),
+	);
+
 	const handleWheel = (e: WheelEvent): void => {
 		updateMouseLocImmediately(e);
 
@@ -2624,29 +2795,25 @@
 
 					<g pointer-events="none">
 						<g filter="url(#componentOutlineFilter)">
-							{#each movesForRender as move (move.i)}
-								{#if playerFromIndex(move.i) === 1}
-									<rect
-										x={move.coords[0] - 1 / 2}
-										y={move.coords[1] - 1 / 2}
-										width="1"
-										height="1"
-										fill="black"
-									></rect>
-								{/if}
+							{#each componentCutoutRects.p1 as r (r)}
+								<rect
+									x={r.x0}
+									y={r.y0}
+									width={r.x1 - r.x0}
+									height={r.y1 - r.y0}
+									fill="black"
+								></rect>
 							{/each}
 						</g>
 						<g filter="url(#componentOutlineFilter)">
-							{#each movesForRender as move (move.i)}
-								{#if playerFromIndex(move.i) === 2}
-									<rect
-										x={move.coords[0] - 1 / 2}
-										y={move.coords[1] - 1 / 2}
-										width="1"
-										height="1"
-										fill="black"
-									></rect>
-								{/if}
+							{#each componentCutoutRects.p2 as r (r)}
+								<rect
+									x={r.x0}
+									y={r.y0}
+									width={r.x1 - r.x0}
+									height={r.y1 - r.y0}
+									fill="black"
+								></rect>
 							{/each}
 						</g>
 					</g>
