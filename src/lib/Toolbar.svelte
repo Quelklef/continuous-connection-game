@@ -320,7 +320,7 @@
 		<div class="section">
 			<div class="sectionTitle">
 				<div>turn timer</div>
-				<label class="timerEnable">
+				<label class="sectionEnable">
 					<input
 						class="check"
 						type="checkbox"
@@ -575,20 +575,20 @@
 			<div class="section">
 				<div class="sectionTitle">
 					<div>multiplayer</div>
+					<label class="sectionEnable">
+						<input
+							class="check"
+							type="checkbox"
+							aria-label="Enable multiplayer"
+							checked={isMultiplayerEnabled}
+							onchange={(e) =>
+								setMultiplayerEnabled(
+									(e.currentTarget as HTMLInputElement).checked,
+								)}
+						/>
+						<span class="muted">enable</span>
+					</label>
 				</div>
-				<label class="kv kvLabel">
-					<span class="muted">enable</span>
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Enable multiplayer"
-						checked={isMultiplayerEnabled}
-						onchange={(e) =>
-							setMultiplayerEnabled(
-								(e.currentTarget as HTMLInputElement).checked,
-							)}
-					/>
-				</label>
 				<div class="wsStatus" aria-label="Multiplayer connection status">
 					<div class="muted">status</div>
 					<div class="wsStatusRight">
@@ -1104,13 +1104,18 @@
 		margin-bottom: 8px;
 	}
 
-	.timerEnable {
+	.sectionEnable {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
-		font-size: 12px;
+		gap: 8px;
+		font-size: 10px;
 		font-weight: 600;
 		user-select: none;
+	}
+
+	.sectionEnable .check {
+		transform: scale(0.8);
+		transform-origin: left center;
 	}
 
 	.timerGrid {
