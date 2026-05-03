@@ -29,8 +29,10 @@ export const isMoveData = (x: unknown): x is [number, number] =>
 export const isClockSettings = (x: unknown): x is ClockSettings =>
 	typeof x === "object" &&
 	x !== null &&
+	"enabled" in x &&
 	"totalMs" in x &&
 	"gainMs" in x &&
+	typeof (x as ClockSettings).enabled === "boolean" &&
 	isFiniteNumber((x as ClockSettings).totalMs) &&
 	isFiniteNumber((x as ClockSettings).gainMs) &&
 	(x as ClockSettings).totalMs >= 0 &&

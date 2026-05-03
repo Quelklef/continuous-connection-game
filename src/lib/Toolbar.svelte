@@ -13,11 +13,13 @@
 
 		clockStarted: boolean;
 		clockPaused: boolean;
+		clockEnabled: boolean;
 		clockTotalMs: number;
 		clockGainMs: number;
 		clockRemainingMsP1: number;
 		clockRemainingMsP2: number;
 		clockActivePlayer: 1 | 2;
+		toggleClockEnabled: () => void;
 		setClockTotalMs: (next: number) => void;
 		setClockGainMs: (next: number) => void;
 		toggleClockPaused: () => void;
@@ -68,11 +70,13 @@
 
 		clockStarted,
 		clockPaused,
+		clockEnabled,
 		clockTotalMs,
 		clockGainMs,
 		clockRemainingMsP1,
 		clockRemainingMsP2,
 		clockActivePlayer,
+		toggleClockEnabled,
 		setClockTotalMs,
 		setClockGainMs,
 		toggleClockPaused,
@@ -140,11 +144,13 @@
 	});
 
 	const commitTotal = (): void => {
+		if (!clockEnabled) return;
 		const parsed = Number.parseInt(totalSecondsDraft.trim(), 10);
 		if (Number.isNaN(parsed)) return;
 		setClockTotalMs(clampInt(parsed, 0, 24 * 60 * 60) * 1000);
 	};
 	const commitGain = (): void => {
+		if (!clockEnabled) return;
 		const parsed = Number.parseInt(gainSecondsDraft.trim(), 10);
 		if (Number.isNaN(parsed)) return;
 		setClockGainMs(clampInt(parsed, 0, 24 * 60 * 60) * 1000);
@@ -314,6 +320,16 @@
 		<div class="section">
 			<div class="sectionTitle">
 				<div>turn timer</div>
+				<label class="timerEnable">
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Enable turn timer"
+						checked={clockEnabled}
+						onchange={toggleClockEnabled}
+					/>
+					<span class="muted">enable</span>
+				</label>
 			</div>
 			<div class="timerTop">
 				<div class="timerParams">
@@ -346,6 +362,7 @@
 				</div>
 				<button
 					class="iconBtn"
+					disabled={!clockEnabled}
 					title={clockPaused ? "Resume turn timer" : "Pause turn timer"}
 					aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
 					onclick={toggleClockPaused}
@@ -381,7 +398,9 @@
 					</div>
 				</div>
 			</div>
-			{#if !clockStarted}
+			{#if !clockEnabled}
+				<div class="timerNote muted">disabled</div>
+			{:else if !clockStarted}
 				<div class="timerNote muted">starts after p1’s first move</div>
 			{/if}
 		</div>
@@ -1083,6 +1102,15 @@
 		justify-content: space-between;
 		gap: 10px;
 		margin-bottom: 8px;
+	}
+
+	.timerEnable {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-size: 12px;
+		font-weight: 600;
+		user-select: none;
 	}
 
 	.timerGrid {

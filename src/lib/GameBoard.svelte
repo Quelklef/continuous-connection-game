@@ -551,6 +551,7 @@
 	);
 
 	const defaultClockSettings: ClockSettings = {
+		enabled: true,
 		totalMs: 5 * 60 * 1000,
 		gainMs: 0,
 	};
@@ -573,6 +574,7 @@
 	};
 
 	const settleClockTo = (activePlayer: Player, atMs: number): void => {
+		if (!clockSettings.enabled) return;
 		if (!clockStarted) {
 			clockLastAtMs = atMs;
 			return;
@@ -602,6 +604,10 @@
 		nextTurnPlayer: Player,
 		atMs: number,
 	): void => {
+		if (!clockSettings.enabled) {
+			clockLastAtMs = atMs;
+			return;
+		}
 		if (!clockStarted || clockPaused) {
 			clockLastAtMs = atMs;
 			return;
@@ -616,6 +622,7 @@
 
 	$effect(() => {
 		if (typeof window === "undefined") return;
+		if (!clockSettings.enabled) return;
 		if (!clockStarted || clockPaused) return;
 
 		clockUiNowMs = Date.now();
@@ -627,6 +634,7 @@
 
 	const clockDisplayRemainingMsP1 = $derived(
 		(() => {
+			if (!clockSettings.enabled) return clockRemainingMsP1;
 			if (!clockStarted || clockPaused) return clockRemainingMsP1;
 			if (turnPlayer !== 1) return clockRemainingMsP1;
 			if (clockLastAtMs === null || clockUiNowMs <= 0)
@@ -636,6 +644,7 @@
 	);
 	const clockDisplayRemainingMsP2 = $derived(
 		(() => {
+			if (!clockSettings.enabled) return clockRemainingMsP2;
 			if (!clockStarted || clockPaused) return clockRemainingMsP2;
 			if (turnPlayer !== 2) return clockRemainingMsP2;
 			if (clockLastAtMs === null || clockUiNowMs <= 0)
@@ -1860,7 +1869,7 @@
 
 								const wasStarted = clockStarted;
 								const isStartingNow = !wasStarted && prevMoveCount === 0;
-								if (isStartingNow) clockStarted = true;
+								if (isStartingNow && clockSettings.enabled) clockStarted = true;
 
 								const nextTurn = playerFromIndex(prevMoveCount + 1);
 								if (!isStartingNow)
@@ -2214,8 +2223,10 @@
 				const wasStarted = clockStarted;
 				const isStartingNow = !wasStarted && prevMoveCount === 0;
 				if (isStartingNow) {
-					clockStarted = true;
-					clockLastAtMs = atMs;
+					if (clockSettings.enabled) {
+						clockStarted = true;
+						clockLastAtMs = atMs;
+					}
 				} else {
 					const nextTurn = playerFromIndex(prevMoveCount + 1);
 					applyClockTurnTransition(prevTurn, nextTurn, atMs);
@@ -2694,11 +2705,24 @@
 				{turnColor}
 				{clockStarted}
 				{clockPaused}
+				clockEnabled={clockSettings.enabled}
 				clockTotalMs={clockSettings.totalMs}
 				clockGainMs={clockSettings.gainMs}
 				clockRemainingMsP1={clockDisplayRemainingMsP1}
 				clockRemainingMsP2={clockDisplayRemainingMsP2}
 				clockActivePlayer={turnPlayer}
+				toggleClockEnabled={() => {
+					const nextSettings: ClockSettings = {
+						...clockSettings,
+						enabled: !clockSettings.enabled,
+					};
+					if (playerMode === 1 || !connected) resetClock(nextSettings);
+					else
+						send(playerMode.socket, {
+							type: "clock",
+							data: { kind: "settings", settings: nextSettings },
+						});
+				}}
 				setClockTotalMs={(next) => {
 					const nextSettings: ClockSettings = {
 						...clockSettings,

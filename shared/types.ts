@@ -2,7 +2,11 @@ export type MoveData = [number, number];
 export type Player = 1 | 2;
 export type BoardColors = { p1: string; p2: string };
 export type StableKey = string;
-export type ClockSettings = { totalMs: number; gainMs: number };
+export type ClockSettings = {
+	enabled: boolean;
+	totalMs: number;
+	gainMs: number;
+};
 export type ClockState = {
 	started: boolean;
 	paused: boolean;
