@@ -2833,11 +2833,15 @@
 					{@const unitsPerPx = viewBox.w / svgPixels.w}
 					{@const t = unitsPerPx * 2}
 					{#if latestStone}
+						{@const cx = latestStone.coords[0]}
+						{@const cy = latestStone.coords[1]}
+						{@const thetaDeg = (latestStone.theta * 180) / Math.PI}
 						<path
-							d={`M ${latestStone.coords[0] - 1 / 2 - t} ${latestStone.coords[1] - 1 / 2 - t} h ${1 + 2 * t} v ${1 + 2 * t} h ${-(1 + 2 * t)} Z M ${latestStone.coords[0] - 1 / 2} ${latestStone.coords[1] - 1 / 2} h 1 v 1 h -1 Z`}
+							d={`M ${cx - 1 / 2 - t} ${cy - 1 / 2 - t} h ${1 + 2 * t} v ${1 + 2 * t} h ${-(1 + 2 * t)} Z M ${cx - 1 / 2} ${cy - 1 / 2} h 1 v 1 h -1 Z`}
 							fill="rgba(0,0,0,0.95)"
 							fill-rule="evenodd"
 							style:pointer-events="none"
+							transform={`rotate(${thetaDeg} ${cx} ${cy})`}
 						></path>
 					{/if}
 				{/if}
