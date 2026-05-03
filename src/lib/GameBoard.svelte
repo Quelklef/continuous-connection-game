@@ -186,10 +186,6 @@
 	const rectIntersects = (a: Rect, b: Rect): boolean =>
 		a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
 
-	const rectEpsilon = 1e-6;
-	const rectIsSubstantial = (r: Rect): boolean =>
-		r.x1 - r.x0 > rectEpsilon && r.y1 - r.y0 > rectEpsilon;
-
 	const subtractRect = (r: Rect, cut: Rect): Rect[] => {
 		if (!rectIntersects(r, cut)) return [r];
 
@@ -200,14 +196,10 @@
 		if (ix0 >= ix1 || iy0 >= iy1) return [r];
 
 		const out: Rect[] = [];
-		const top = { x0: r.x0, y0: r.y0, x1: r.x1, y1: iy0 };
-		const bottom = { x0: r.x0, y0: iy1, x1: r.x1, y1: r.y1 };
-		const left = { x0: r.x0, y0: iy0, x1: ix0, y1: iy1 };
-		const right = { x0: ix1, y0: iy0, x1: r.x1, y1: iy1 };
-		if (rectIsSubstantial(top)) out.push(top);
-		if (rectIsSubstantial(bottom)) out.push(bottom);
-		if (rectIsSubstantial(left)) out.push(left);
-		if (rectIsSubstantial(right)) out.push(right);
+		if (r.y0 < iy0) out.push({ x0: r.x0, y0: r.y0, x1: r.x1, y1: iy0 });
+		if (iy1 < r.y1) out.push({ x0: r.x0, y0: iy1, x1: r.x1, y1: r.y1 });
+		if (r.x0 < ix0) out.push({ x0: r.x0, y0: iy0, x1: ix0, y1: iy1 });
+		if (ix1 < r.x1) out.push({ x0: ix1, y0: iy0, x1: r.x1, y1: iy1 });
 		return out;
 	};
 
@@ -216,10 +208,10 @@
 		for (const c of cuts) {
 			const next: Rect[] = [];
 			for (const p of pieces) next.push(...subtractRect(p, c));
-			pieces = next.filter(rectIsSubstantial);
+			pieces = next;
 			if (pieces.length === 0) break;
 		}
-		return pieces.filter(rectIsSubstantial);
+		return pieces;
 	};
 
 	const computeStoneCutoutAt = (
