@@ -385,14 +385,14 @@
 				</button>
 			</div>
 			<div class="timerGrid" aria-label="Turn timer">
-				<div class="timerRow" class:active={clockActivePlayer === 1}>
-					<div class="muted">p1</div>
+				<div class="timerHalf" class:active={clockActivePlayer === 1}>
+					<div class="timerPlayer muted">p1</div>
 					<div class="timerValue" class:overtime={clockRemainingMsP1 < 0}>
 						{formatMs(clockRemainingMsP1)}
 					</div>
 				</div>
-				<div class="timerRow" class:active={clockActivePlayer === 2}>
-					<div class="muted">p2</div>
+				<div class="timerHalf" class:active={clockActivePlayer === 2}>
+					<div class="timerPlayer muted">p2</div>
 					<div class="timerValue" class:overtime={clockRemainingMsP2 < 0}>
 						{formatMs(clockRemainingMsP2)}
 					</div>
@@ -1121,23 +1121,28 @@
 
 	.timerGrid {
 		display: grid;
+		grid-template-columns: 1fr 1fr;
 		gap: 6px;
 	}
 
-	.timerRow {
+	.timerHalf {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 10px;
+		gap: 6px;
 		padding: 6px 8px;
 		border-radius: 12px;
 		background: rgba(255, 255, 255, 0.55);
 		border: 1px solid rgba(0, 0, 0, 0.06);
 	}
 
-	.timerRow.active {
+	.timerHalf.active {
 		background: rgba(255, 255, 255, 0.85);
 		border-color: rgba(0, 0, 0, 0.12);
+	}
+
+	.timerPlayer {
+		min-width: 18px;
 	}
 
 	.timerValue {
