@@ -330,6 +330,155 @@
 
 		<div class="section">
 			<div class="sectionTitle">
+				<div>board size</div>
+			</div>
+			<div class="stepper" aria-label="Board size">
+				<button
+					class="stepBtn"
+					title="Decrease board size"
+					aria-label="Decrease board size"
+					disabled={size <= minBoardSize}
+					onclick={() => applyBoardSize(size - 1)}
+				>
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M6.5 12.9h11v-1.8h-11v1.8Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					</svg>
+				</button>
+				<button
+					type="button"
+					class="stepValue"
+					aria-label="Current board size"
+					title="Click to edit"
+					onclick={beginEditSize}
+				>
+					{#if isSizeEditing}
+						<input
+							bind:this={sizeInput}
+							class="stepValueInput"
+							type="text"
+							inputmode="numeric"
+							autocomplete="off"
+							aria-label="Board size in stones"
+							bind:value={sizeDraft}
+							onblur={commitEditSize}
+							onkeydown={(e) => {
+								if (e.key === "Enter") {
+									e.preventDefault();
+									commitEditSize();
+								} else if (e.key === "Escape") {
+									e.preventDefault();
+									cancelEditSize();
+								}
+							}}
+						/>
+					{:else}
+						<div class="stepValueNumber">{size}</div>
+					{/if}
+					<div class="stepValueLabel">stones</div>
+				</button>
+				<button
+					class="stepBtn"
+					title="Increase board size"
+					aria-label="Increase board size"
+					disabled={size >= maxBoardSize}
+					onclick={() => applyBoardSize(size + 1)}
+				>
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M11.1 6.5v4.6H6.5v1.8h4.6v4.6h1.8v-4.6h4.6v-1.8h-4.6V6.5h-1.8Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					</svg>
+				</button>
+			</div>
+		</div>
+
+		{#if isWsConfigShown}
+			<div class="section">
+				<div class="sectionTitle">
+					<div>multiplayer</div>
+					<label class="sectionEnable">
+						<input
+							class="check"
+							type="checkbox"
+							aria-label="Enable multiplayer"
+							checked={isMultiplayerEnabled}
+							onchange={(e) =>
+								setMultiplayerEnabled(
+									(e.currentTarget as HTMLInputElement).checked,
+								)}
+						/>
+						<span class="muted">enable</span>
+					</label>
+				</div>
+				<div class="wsStatus" aria-label="Multiplayer connection status">
+					<div class="muted">status</div>
+					<div class="wsStatusRight">
+						<div class="wsStatusText">{wsStatus}</div>
+						<span
+							class="wsDot"
+							class:online={wsStatus === "online"}
+							class:connecting={wsStatus === "connecting"}
+						></span>
+					</div>
+				</div>
+				<div class="wsEditor" style:margin-top="8px">
+					<div class="wsEditorMain">
+						<div class="wsEditorShell">
+							<input
+								class="wsInput"
+								aria-label="WebSocket URL"
+								bind:value={wsUrlDraft}
+								placeholder="ws://localhost:8090"
+								onkeydown={onWsInputKeyDown}
+							/>
+							{#if isWsDirty}
+								<div class="wsEditorButtons">
+									<button
+										class="wsAttachBtn wsAttachLeft"
+										disabled={!wsUrlDraft.trim()}
+										onclick={connectToDraftUrl}
+									>
+										connect
+									</button>
+									<button
+										class="wsAttachBtn wsAttachRight"
+										onclick={cancelWsEdit}
+									>
+										cancel
+									</button>
+								</div>
+							{/if}
+						</div>
+					</div>
+					<button
+						class="wsSaveIconBtn"
+						title="Save WebSocket target to URL"
+						aria-label="Save WebSocket target to URL"
+						onclick={saveWsTargetToUrl}
+					>
+						<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+							<path
+								d="M6 4.5h10.6L20.5 8.4V19A1.5 1.5 0 0 1 19 20.5H6A1.5 1.5 0 0 1 4.5 19V6A1.5 1.5 0 0 1 6 4.5Zm0 2V19h13V9.2l-2.8-2.7H6Zm2 1.5h6v4H8v-4Zm0 8h8v3H8v-3Z"
+								fill="currentColor"
+								opacity="0.9"
+							/>
+						</svg>
+					</button>
+				</div>
+				{#if wsUrlError}
+					<div class="wsError">{wsUrlError}</div>
+				{/if}
+			</div>
+		{/if}
+
+		<div class="section">
+			<div class="sectionTitle">
 				<div>turn timer</div>
 				<label class="sectionEnable">
 					<input
@@ -418,129 +567,7 @@
 
 		<div class="section">
 			<div class="sectionTitle">
-				<div>board size</div>
-			</div>
-			<div class="stepper" aria-label="Board size">
-				<button
-					class="stepBtn"
-					title="Decrease board size"
-					aria-label="Decrease board size"
-					disabled={size <= minBoardSize}
-					onclick={() => applyBoardSize(size - 1)}
-				>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M6.5 12.9h11v-1.8h-11v1.8Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-				</button>
-				<button
-					type="button"
-					class="stepValue"
-					aria-label="Current board size"
-					title="Click to edit"
-					onclick={beginEditSize}
-				>
-					{#if isSizeEditing}
-						<input
-							bind:this={sizeInput}
-							class="stepValueInput"
-							type="text"
-							inputmode="numeric"
-							autocomplete="off"
-							aria-label="Board size in stones"
-							bind:value={sizeDraft}
-							onblur={commitEditSize}
-							onkeydown={(e) => {
-								if (e.key === "Enter") {
-									e.preventDefault();
-									commitEditSize();
-								} else if (e.key === "Escape") {
-									e.preventDefault();
-									cancelEditSize();
-								}
-							}}
-						/>
-					{:else}
-						<div class="stepValueNumber">{size}</div>
-					{/if}
-					<div class="stepValueLabel">stones</div>
-				</button>
-				<button
-					class="stepBtn"
-					title="Increase board size"
-					aria-label="Increase board size"
-					disabled={size >= maxBoardSize}
-					onclick={() => applyBoardSize(size + 1)}
-				>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M11.1 6.5v4.6H6.5v1.8h4.6v4.6h1.8v-4.6h4.6v-1.8h-4.6V6.5h-1.8Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-				</button>
-			</div>
-		</div>
-
-		<div class="section">
-			<div class="sectionTitle">
-				<div>colors</div>
-			</div>
-
-			<div class="colorRow" title={resetColorsTitle}>
-				<div class="colorInline">
-					<div class="colorSwatch">
-						<span class="swatchDot" style:background={player1Color}></span>
-						<div class="muted">p1</div>
-					</div>
-					<input
-						class="colorInput"
-						type="color"
-						aria-label="player 1 color"
-						bind:value={player1Color}
-						onchange={commitColors}
-					/>
-				</div>
-
-				<div class="colorInline">
-					<div class="colorSwatch">
-						<span class="swatchDot" style:background={player2Color}></span>
-						<div class="muted">p2</div>
-					</div>
-					<input
-						class="colorInput"
-						type="color"
-						aria-label="player 2 color"
-						bind:value={player2Color}
-						onchange={commitColors}
-					/>
-				</div>
-
-				<button
-					class="iconBtn"
-					disabled={isResetColorsDisabled}
-					title={resetColorsTitle}
-					aria-label="Reset colors"
-					onclick={resetColors}
-				>
-					<svg class="icon iconLarge" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M6.2 8.5A7 7 0 1 1 5 12h2a5 5 0 1 0 1.2-3.2L10 10.6V5H5l1.2 1.2Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-				</button>
-			</div>
-		</div>
-
-		<div class="section">
-			<div class="sectionTitle">
-				<div>actions</div>
+				<div>game actions</div>
 			</div>
 			<div class="buttons">
 				<button class="btn" disabled={isUndoDisabled} onclick={undo}>
@@ -648,85 +675,6 @@
 			<div class="modeNote">hold the key, or use shift+key to toggle</div>
 		</div>
 
-		{#if isWsConfigShown}
-			<div class="section">
-				<div class="sectionTitle">
-					<div>multiplayer</div>
-					<label class="sectionEnable">
-						<input
-							class="check"
-							type="checkbox"
-							aria-label="Enable multiplayer"
-							checked={isMultiplayerEnabled}
-							onchange={(e) =>
-								setMultiplayerEnabled(
-									(e.currentTarget as HTMLInputElement).checked,
-								)}
-						/>
-						<span class="muted">enable</span>
-					</label>
-				</div>
-				<div class="wsStatus" aria-label="Multiplayer connection status">
-					<div class="muted">status</div>
-					<div class="wsStatusRight">
-						<div class="wsStatusText">{wsStatus}</div>
-						<span
-							class="wsDot"
-							class:online={wsStatus === "online"}
-							class:connecting={wsStatus === "connecting"}
-						></span>
-					</div>
-				</div>
-				<div class="wsEditor" style:margin-top="8px">
-					<div class="wsEditorMain">
-						<div class="wsEditorShell">
-							<input
-								class="wsInput"
-								aria-label="WebSocket URL"
-								bind:value={wsUrlDraft}
-								placeholder="ws://localhost:8090"
-								onkeydown={onWsInputKeyDown}
-							/>
-							{#if isWsDirty}
-								<div class="wsEditorButtons">
-									<button
-										class="wsAttachBtn wsAttachLeft"
-										disabled={!wsUrlDraft.trim()}
-										onclick={connectToDraftUrl}
-									>
-										connect
-									</button>
-									<button
-										class="wsAttachBtn wsAttachRight"
-										onclick={cancelWsEdit}
-									>
-										cancel
-									</button>
-								</div>
-							{/if}
-						</div>
-					</div>
-					<button
-						class="wsSaveIconBtn"
-						title="Save WebSocket target to URL"
-						aria-label="Save WebSocket target to URL"
-						onclick={saveWsTargetToUrl}
-					>
-						<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-							<path
-								d="M6 4.5h10.6L20.5 8.4V19A1.5 1.5 0 0 1 19 20.5H6A1.5 1.5 0 0 1 4.5 19V6A1.5 1.5 0 0 1 6 4.5Zm0 2V19h13V9.2l-2.8-2.7H6Zm2 1.5h6v4H8v-4Zm0 8h8v3H8v-3Z"
-								fill="currentColor"
-								opacity="0.9"
-							/>
-						</svg>
-					</button>
-				</div>
-				{#if wsUrlError}
-					<div class="wsError">{wsUrlError}</div>
-				{/if}
-			</div>
-		{/if}
-
 		<div class="section">
 			<div class="sectionTitle">
 				<div>keybindings</div>
@@ -740,6 +688,58 @@
 					<div class="keycap">f mode + ctrl</div>
 					<div>shared preview (send/receive)</div>
 				{/if}
+			</div>
+		</div>
+
+		<div class="section">
+			<div class="sectionTitle">
+				<div>player colors</div>
+			</div>
+
+			<div class="colorRow" title={resetColorsTitle}>
+				<div class="colorInline">
+					<div class="colorSwatch">
+						<span class="swatchDot" style:background={player1Color}></span>
+						<div class="muted">p1</div>
+					</div>
+					<input
+						class="colorInput"
+						type="color"
+						aria-label="player 1 color"
+						bind:value={player1Color}
+						onchange={commitColors}
+					/>
+				</div>
+
+				<div class="colorInline">
+					<div class="colorSwatch">
+						<span class="swatchDot" style:background={player2Color}></span>
+						<div class="muted">p2</div>
+					</div>
+					<input
+						class="colorInput"
+						type="color"
+						aria-label="player 2 color"
+						bind:value={player2Color}
+						onchange={commitColors}
+					/>
+				</div>
+
+				<button
+					class="iconBtn"
+					disabled={isResetColorsDisabled}
+					title={resetColorsTitle}
+					aria-label="Reset colors"
+					onclick={resetColors}
+				>
+					<svg class="icon iconLarge" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M6.2 8.5A7 7 0 1 1 5 12h2a5 5 0 1 0 1.2-3.2L10 10.6V5H5l1.2 1.2Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					</svg>
+				</button>
 			</div>
 		</div>
 	</div>
