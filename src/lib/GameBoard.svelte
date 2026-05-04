@@ -3013,8 +3013,9 @@
 									x2="0.18"
 									y2="0.18"
 									stroke={latestIndexTextStyle.fill}
-									stroke-opacity="0.8"
-									stroke-width="0.06"
+									stroke-opacity="1"
+									stroke-width="2"
+									vector-effect="non-scaling-stroke"
 								/>
 								<line
 									x1="0"
@@ -3022,15 +3023,16 @@
 									x2="0.18"
 									y2="0"
 									stroke={latestIndexTextStyle.fill}
-									stroke-opacity="0.8"
-									stroke-width="0.06"
+									stroke-opacity="1"
+									stroke-width="2"
+									vector-effect="non-scaling-stroke"
 								/>
 							</pattern>
 						</defs>
 						<path
 							d={`M ${cx - 1 / 2} ${cy - 1 / 2} h 1 v 1 h -1 Z M ${cx - 0.22} ${cy - 0.22} h 0.44 v 0.44 h -0.44 Z`}
 							fill="url(#latestMoveHatch)"
-							fill-opacity="0.6"
+							fill-opacity="1"
 							fill-rule="evenodd"
 							style:pointer-events="none"
 							transform={`rotate(${thetaDeg} ${cx} ${cy})`}
