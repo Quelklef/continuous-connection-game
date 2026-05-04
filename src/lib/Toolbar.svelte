@@ -242,7 +242,7 @@
 		<div class="kv">
 			<div class="muted">board size</div>
 			<div class="boardSizeRight">
-				<div class="boardSizeValue">[{size}]</div>
+				<div class="boardSizeValue">{size}</div>
 				<button
 					class="iconBtn"
 					title="Decrease board size"
