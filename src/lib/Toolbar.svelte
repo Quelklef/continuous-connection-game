@@ -601,7 +601,6 @@
 		<div class="colorRow" title={resetColorsTitle}>
 			<div class="colorInline">
 				<div class="colorSwatch">
-					<span class="swatchDot" style:background={player1Color}></span>
 					<div class="muted">p1</div>
 				</div>
 				<input
@@ -615,7 +614,6 @@
 
 			<div class="colorInline">
 				<div class="colorSwatch">
-					<span class="swatchDot" style:background={player2Color}></span>
 					<div class="muted">p2</div>
 				</div>
 				<input
@@ -1031,14 +1029,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-	}
-
-	.swatchDot {
-		width: 9px;
-		height: 9px;
-		border-radius: 999px;
-		border: 1px solid rgba(0, 0, 0, 0.14);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 	}
 
 	.buttons {
