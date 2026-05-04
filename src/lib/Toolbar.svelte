@@ -589,11 +589,11 @@
 			<div class="shortcutList" aria-label="Modes">
 				<div class="keycap">e</div>
 				<div class="modeCell">
-					<div>extra mode</div>
+					<div>show extra info</div>
 					<input
 						class="check"
 						type="checkbox"
-						aria-label="Toggle extra mode"
+						aria-label="Toggle extra info"
 						checked={extraInfoEnabled}
 						onchange={(e) =>
 							setExtraInfoEnabled(
@@ -604,11 +604,14 @@
 
 				<div class="keycap">r</div>
 				<div class="modeCell">
-					<div>rotate mode</div>
+					<div class="modeCellLeft">
+						<div>stone rotation mode</div>
+						<div class="modeHint">hold ctrl for finer rotation</div>
+					</div>
 					<input
 						class="check"
 						type="checkbox"
-						aria-label="Toggle rotate mode"
+						aria-label="Toggle stone rotation mode"
 						checked={rotationEnabled}
 						onchange={(e) =>
 							setRotationEnabled((e.currentTarget as HTMLInputElement).checked)}
@@ -617,11 +620,11 @@
 
 				<div class="keycap">b</div>
 				<div class="modeCell">
-					<div>borders mode</div>
+					<div>show component borders</div>
 					<input
 						class="check"
 						type="checkbox"
-						aria-label="Toggle borders mode"
+						aria-label="Toggle component borders"
 						checked={bordersShown}
 						onchange={(e) =>
 							setBordersShown((e.currentTarget as HTMLInputElement).checked)}
@@ -630,11 +633,11 @@
 
 				<div class="keycap">f</div>
 				<div class="modeCell">
-					<div>future mode</div>
+					<div>preview future moves</div>
 					<input
 						class="check"
 						type="checkbox"
-						aria-label="Toggle future mode"
+						aria-label="Toggle future move preview"
 						checked={futureEnabled}
 						disabled={isFutureToggleDisabled}
 						onchange={(e) =>
@@ -733,10 +736,6 @@
 				<div>zoom</div>
 				<div class="keycap">right-drag</div>
 				<div>pan</div>
-				<div class="keycap">r mode + scroll</div>
-				<div>rotate stone</div>
-				<div class="keycap">r mode + ctrl + scroll</div>
-				<div>rotate stone (fine)</div>
 				{#if isMultiplayerEnabled}
 					<div class="keycap">f mode + ctrl</div>
 					<div>shared preview (send/receive)</div>
@@ -1175,6 +1174,18 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 10px;
+	}
+
+	.modeCellLeft {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.modeHint {
+		font-size: 11px;
+		line-height: 1.2;
+		color: rgba(0, 0, 0, 0.64);
 	}
 
 	.modeNote {
