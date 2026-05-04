@@ -274,7 +274,7 @@
 
 		<div class="kv" style:margin-top="8px">
 			<div class="muted">moves played</div>
-			<div>[{movesPlayed}]</div>
+			<div>{movesPlayed}</div>
 		</div>
 
 		<div class="kv" style:margin-top="10px">
