@@ -564,10 +564,8 @@
 						setBordersShown((e.currentTarget as HTMLInputElement).checked)}
 				/>
 			</label>
-
-			<div class="keycap"></div>
-			<div class="muted">modes: hold key or use shift+key to toggle</div>
 		</div>
+		<div class="keyNote muted">modes: hold key or use shift+key to toggle</div>
 	</div>
 {/snippet}
 
@@ -782,6 +780,12 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
+	}
+
+	.keyNote {
+		margin-top: 8px;
+		font-size: 12px;
+		line-height: 1.2;
 	}
 
 	.modeRow {
