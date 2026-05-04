@@ -449,7 +449,13 @@
 				onclick={saveWsTargetToUrl}
 				disabled={!isWsConfigShown}
 			>
-				save
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path
+						d="M6 4.5h10.6L20.5 8.4V19A1.5 1.5 0 0 1 19 20.5H6A1.5 1.5 0 0 1 4.5 19V6A1.5 1.5 0 0 1 6 4.5Zm0 2V19h13V9.2l-2.8-2.7H6Zm2 1.5h6v4H8v-4Zm0 8h8v3H8v-3Z"
+						fill="currentColor"
+						opacity="0.9"
+					/>
+				</svg>
 			</button>
 		</div>
 		<div class="wsStatus" aria-label="Multiplayer connection status">
