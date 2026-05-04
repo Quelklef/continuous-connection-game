@@ -244,7 +244,7 @@
 			<div class="boardSizeRight">
 				<div class="boardSizeValue">{size}</div>
 				<button
-					class="iconBtn"
+					class="iconBtn miniBtn"
 					title="Decrease board size"
 					aria-label="Decrease board size"
 					disabled={size <= minBoardSize}
@@ -253,7 +253,7 @@
 					-
 				</button>
 				<button
-					class="iconBtn"
+					class="iconBtn miniBtn"
 					title="Increase board size"
 					aria-label="Increase board size"
 					disabled={size >= maxBoardSize}
@@ -878,6 +878,14 @@
 
 	.iconBtn:disabled:hover {
 		transform: none;
+	}
+
+	.miniBtn {
+		width: 24px;
+		height: 24px;
+		border-radius: 8px;
+		font-size: 14px;
+		line-height: 1;
 	}
 
 	.colorRow {
