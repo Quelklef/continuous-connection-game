@@ -95,7 +95,20 @@
 	let hasReceivedServerColors = $state(false);
 	let isComponentOutlinesEnabled = $state(false);
 	let isPreviewMode = $state(false);
-	let isAltHeld = $state(false);
+
+	let isExtraInfoHeld = $state(false);
+	let isExtraInfoToggled = $state(false);
+	let isRotationHeld = $state(false);
+	let isRotationToggled = $state(false);
+	let isBordersHeld = $state(false);
+	let isFutureHeld = $state(false);
+	let isFutureToggled = $state(false);
+	let isCtrlHeld = $state(false);
+
+	const isExtraInfoEnabled = $derived(isExtraInfoHeld !== isExtraInfoToggled);
+	const isRotationEnabled = $derived(isRotationHeld !== isRotationToggled);
+	const isBordersShown = $derived(isBordersHeld !== isComponentOutlinesEnabled);
+	const isFutureEnabled = $derived(isFutureHeld !== isFutureToggled);
 	let placementTheta = $state(0);
 
 	let sharedOverlay = $state(emptyOverlayState());
@@ -504,7 +517,7 @@
 	const isPreviewEnabled = $derived(playerMode !== 1 && isPreviewMode);
 	const isHistoryClickEnabled = $derived(playerMode === 1 || isPreviewEnabled);
 	const isSharedPreviewEditEnabled = $derived(
-		isPreviewEnabled && isAltHeld && playerMode !== 1 && connected,
+		isPreviewEnabled && isCtrlHeld && playerMode !== 1 && connected,
 	);
 	const isSharedOverlayVisible = $derived(
 		playerMode !== 1 &&
@@ -633,6 +646,11 @@
 		if (!next && isPreviewEnabled) lastPreviewKey = activeKey;
 		isPreviewMode = next;
 	};
+
+	$effect(() => {
+		if (playerMode === 1) return;
+		setPreviewMode(isFutureEnabled);
+	});
 
 	const hexToRgb = (hex: string): [number, number, number] | null => {
 		if (!isValidHexColor(hex)) return null;
@@ -960,7 +978,7 @@
 		}
 	});
 
-	let isShiftHeld = $state(false);
+	// extra-info mode is controlled via `e` (hold) / `shift+e` (toggle)
 	let boardShotCopyState = $state<"idle" | "copied" | "failed">("idle");
 	let boardShotCopyToken = $state(0);
 	$effect(() => {
@@ -982,14 +1000,18 @@
 			}
 		};
 
+		const isFormTargetEvent = (e: KeyboardEvent): boolean => {
+			const target = e.target;
+			return (
+				target instanceof HTMLInputElement ||
+				target instanceof HTMLTextAreaElement ||
+				target instanceof HTMLSelectElement
+			);
+		};
+
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "z" && e.ctrlKey) {
-				const target = e.target;
-				const isFormTarget =
-					target instanceof HTMLInputElement ||
-					target instanceof HTMLTextAreaElement ||
-					target instanceof HTMLSelectElement;
-				if (isFormTarget) return;
+				if (isFormTargetEvent(e)) return;
 
 				e.preventDefault();
 				if (playerMode === 1) {
@@ -1009,35 +1031,81 @@
 				return;
 			}
 
-			if (e.key === "Shift") isShiftHeld = true;
 			if (e.key === "Control") {
-				const target = e.target;
-				const isFormTarget =
-					target instanceof HTMLInputElement ||
-					target instanceof HTMLTextAreaElement ||
-					target instanceof HTMLSelectElement;
-				if (isFormTarget) return;
-				setPreviewMode(true);
+				isCtrlHeld = true;
+				return;
 			}
-			if (e.key === "Alt") {
-				const target = e.target;
-				const isFormTarget =
-					target instanceof HTMLInputElement ||
-					target instanceof HTMLTextAreaElement ||
-					target instanceof HTMLSelectElement;
-				if (isFormTarget) return;
-				isAltHeld = true;
+
+			const k = e.key.toLowerCase();
+			if (k !== "e" && k !== "r" && k !== "b" && k !== "f") return;
+			if (isFormTargetEvent(e)) return;
+
+			e.preventDefault();
+			if (e.shiftKey && !e.repeat) {
+				switch (k) {
+					case "e":
+						isExtraInfoToggled = !isExtraInfoToggled;
+						break;
+					case "r":
+						isRotationToggled = !isRotationToggled;
+						break;
+					case "b":
+						isComponentOutlinesEnabled = !isComponentOutlinesEnabled;
+						break;
+					case "f":
+						isFutureToggled = !isFutureToggled;
+						break;
+					default:
+						ensureCoverage(k);
+				}
+				return;
+			}
+
+			switch (k) {
+				case "e":
+					isExtraInfoHeld = true;
+					break;
+				case "r":
+					isRotationHeld = true;
+					break;
+				case "b":
+					isBordersHeld = true;
+					break;
+				case "f":
+					isFutureHeld = true;
+					break;
+				default:
+					ensureCoverage(k);
 			}
 		};
 		const onKeyUp = (e: KeyboardEvent) => {
-			if (e.key === "Shift") isShiftHeld = false;
-			if (e.key === "Control") setPreviewMode(false);
-			if (e.key === "Alt") isAltHeld = false;
+			if (e.key === "Control") {
+				isCtrlHeld = false;
+				return;
+			}
+
+			const k = e.key.toLowerCase();
+			switch (k) {
+				case "e":
+					isExtraInfoHeld = false;
+					break;
+				case "r":
+					isRotationHeld = false;
+					break;
+				case "b":
+					isBordersHeld = false;
+					break;
+				case "f":
+					isFutureHeld = false;
+					break;
+			}
 		};
 		const onBlur = () => {
-			isShiftHeld = false;
-			setPreviewMode(false);
-			isAltHeld = false;
+			isExtraInfoHeld = false;
+			isRotationHeld = false;
+			isBordersHeld = false;
+			isFutureHeld = false;
+			isCtrlHeld = false;
 		};
 		const onFocus = () => {
 			syncHover();
@@ -2455,12 +2523,12 @@
 	const handleWheel = (e: WheelEvent): void => {
 		updateMouseLocImmediately(e);
 
-		if (e.altKey && svgPixels && svgPixels.w > 0 && viewBox.w > 0) {
+		if (isRotationEnabled && svgPixels && svgPixels.w > 0 && viewBox.w > 0) {
 			e.preventDefault();
 			const step = Math.sign(e.deltaY);
 			if (step === 0) return;
 
-			const arcPx = e.shiftKey ? 4 : 14;
+			const arcPx = e.ctrlKey ? 4 : 14;
 			const pxPerUnit = svgPixels.w / viewBox.w;
 			const cornerRadiusPx = (Math.SQRT2 / 2) * pxPerUnit;
 			if (cornerRadiusPx <= 0) return;
@@ -2855,7 +2923,7 @@
 					{/each}
 				</g>
 
-				{#if isShiftHeld}
+				{#if isExtraInfoEnabled}
 					{#each movesForRender as move (move.i)}
 						{@const d = pathFromHull(
 							shadowHullForStone(move.stone, placementTheta),
@@ -2905,7 +2973,7 @@
 					{@render shape(move.stone, move.i, false, 1)}
 				{/each}
 
-				{#if isShiftHeld && displayMoveCount > 0 && svgPixels && svgPixels.w > 0}
+				{#if isExtraInfoEnabled && displayMoveCount > 0 && svgPixels && svgPixels.w > 0}
 					{@const latestStone = displayMoves[displayMoveCount - 1]}
 					{@const unitsPerPx = viewBox.w / svgPixels.w}
 					{@const t = unitsPerPx * 2}
@@ -2923,7 +2991,7 @@
 					{/if}
 				{/if}
 
-				{#if isComponentOutlinesEnabled}
+				{#if isBordersShown}
 					<defs>
 						<filter
 							id="componentOutlineFilter"
@@ -2968,7 +3036,7 @@
 					</g>
 				{/if}
 
-				{#if isShiftHeld}
+				{#if isExtraInfoEnabled}
 					{#each movesForRender as move (move.i)}
 						{@const indexTextStyle = stoneIndexTextStyle(move.i)}
 						<text
@@ -3129,23 +3197,21 @@
 					{#if playerMode !== 1 && isSharedPreviewEditEnabled}
 						<div
 							class="ctrlAltHeld"
-							title="Shared preview (holding ctrl+alt) • your preview edits are sent"
+							title="Shared preview (holding f+ctrl) • your preview edits are sent"
 						>
-							CTRL+ALT
+							F+CTRL
 						</div>
 					{:else if playerMode !== 1 && isSharedOverlayVisible && isSharedPreviewLive}
 						<div
 							class="sharedLive"
-							title="Shared preview overlay (live) • hold ctrl to hide"
+							title="Shared preview overlay (live) • hold f to hide"
 						>
 							SHARED{sharedPreviewHolderCount > 0
 								? ` (${sharedPreviewHolderCount})`
 								: ""}
 						</div>
 					{:else if playerMode !== 1 && isPreviewEnabled}
-						<div class="ctrlHeld" title="Preview mode (holding ctrl)">
-							CTRL HELD
-						</div>
+						<div class="ctrlHeld" title="Preview mode (holding f)">F HELD</div>
 					{/if}
 				</div>
 			</div>
@@ -3172,8 +3238,8 @@
 			</div>
 			{#if playerMode !== 1}
 				<div class="historyNote">
-					preview mode: {isPreviewEnabled ? "on" : "off"} (hold ctrl). preview mode
-					lets you explore game branches without affecting the real multiplayer game
+					preview mode: {isPreviewEnabled ? "on" : "off"} (hold f). preview mode lets
+					you explore game branches without affecting the real multiplayer game
 				</div>
 			{/if}
 		</div>

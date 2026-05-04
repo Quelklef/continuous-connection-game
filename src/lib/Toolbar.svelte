@@ -655,20 +655,30 @@
 				<div>keybindings</div>
 			</div>
 			<div class="shortcutList">
-				<div class="keycap">shift</div>
-				<div>display extra board info</div>
 				<div class="keycap">scroll</div>
 				<div>zoom</div>
-				<div class="keycap">alt+scroll</div>
-				<div>rotate stone</div>
-				<div class="keycap">alt+shift+scroll</div>
-				<div>rotate stone (fine)</div>
 				<div class="keycap">right-drag</div>
 				<div>pan</div>
+				<div class="keycap">e</div>
+				<div>extra info</div>
+				<div class="keycap">shift+e</div>
+				<div>toggle extra info</div>
+				<div class="keycap">r + scroll</div>
+				<div>rotate stone</div>
+				<div class="keycap">r + ctrl + scroll</div>
+				<div>rotate stone (fine)</div>
+				<div class="keycap">shift+r</div>
+				<div>toggle rotation mode</div>
+				<div class="keycap">b</div>
+				<div>component borders</div>
+				<div class="keycap">shift+b</div>
+				<div>toggle component borders</div>
 				{#if isMultiplayerEnabled}
-					<div class="keycap">ctrl</div>
-					<div>preview history</div>
-					<div class="keycap">ctrl+alt</div>
+					<div class="keycap">f</div>
+					<div>preview future moves</div>
+					<div class="keycap">shift+f</div>
+					<div>toggle preview</div>
+					<div class="keycap">f + ctrl</div>
 					<div>shared preview (send/receive)</div>
 				{/if}
 			</div>
