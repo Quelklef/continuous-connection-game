@@ -504,7 +504,7 @@
 			<div class="keycap">e</div>
 			<label class="modeRow modeLabel">
 				<div>
-					show extra info <span class="muted">*(mode)*</span>
+					show extra info <span class="modeTag">(mode)</span>
 				</div>
 				<input
 					class="check"
@@ -519,7 +519,7 @@
 			<div class="keycap">r</div>
 			<label class="modeRow modeLabel">
 				<div>
-					rotate stone <span class="muted">*(mode)*</span>
+					rotate stone <span class="modeTag">(mode)</span>
 				</div>
 				<input
 					class="check"
@@ -537,7 +537,7 @@
 			<div class="keycap">f</div>
 			<label class="modeRow modeLabel">
 				<div>
-					preview future moves <span class="muted">*(mode)*</span>
+					preview future moves <span class="modeTag">(mode)</span>
 				</div>
 				<input
 					class="check"
@@ -553,7 +553,7 @@
 			<div class="keycap">b</div>
 			<label class="modeRow modeLabel">
 				<div>
-					show component borders <span class="muted">*(mode)*</span>
+					show component borders <span class="modeTag">(mode)</span>
 				</div>
 				<input
 					class="check"
@@ -794,6 +794,12 @@
 	.modeLabel {
 		cursor: pointer;
 		user-select: none;
+	}
+
+	.modeTag {
+		font-size: 11px;
+		opacity: 0.58;
+		font-style: italic;
 	}
 
 	.wsEditor {
