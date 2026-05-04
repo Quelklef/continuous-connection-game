@@ -277,7 +277,7 @@
 			<div>{movesPlayed}</div>
 		</div>
 
-		<div class="kv" style:margin-top="10px">
+		<div class="timerHeader" style:margin-top="10px">
 			<div class="muted">turn timer</div>
 			<label class="sectionEnable">
 				<input
@@ -720,6 +720,13 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 8px;
+	}
+
+	.timerHeader {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
 	}
 
 	.keyRow {
