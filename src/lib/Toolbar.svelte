@@ -346,15 +346,6 @@
 					/>
 				</label>
 			</div>
-			<button
-				class="iconBtn"
-				disabled={!clockEnabled}
-				title={clockPaused ? "Resume turn timer" : "Pause turn timer"}
-				aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
-				onclick={toggleClockPaused}
-			>
-				pause
-			</button>
 		</div>
 
 		{#if !clockEnabled}
