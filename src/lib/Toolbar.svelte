@@ -6,7 +6,6 @@
 		setMultiplayerEnabled: (next: boolean) => void;
 
 		copyBoardShot: () => void;
-		boardShotCopyState: "idle" | "copied" | "failed";
 
 		turnPlayer: 1 | 2;
 
@@ -72,7 +71,6 @@
 		setMultiplayerEnabled,
 
 		copyBoardShot,
-		boardShotCopyState,
 
 		turnPlayer,
 
@@ -930,22 +928,6 @@
 		margin-top: 8px;
 		font-size: 12px;
 		color: rgba(180, 20, 40, 0.92);
-	}
-
-	.shotRight {
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.shotStatus {
-		font-size: 12px;
-		font-weight: 650;
-		opacity: 0.85;
-	}
-
-	.shotStatus.ok {
-		color: rgba(10, 120, 55, 0.95);
 	}
 
 	.check {

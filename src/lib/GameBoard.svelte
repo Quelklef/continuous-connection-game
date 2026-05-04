@@ -969,8 +969,6 @@
 	});
 
 	// extra-info mode is controlled via `e` (hold) / `shift+e` (toggle)
-	let boardShotCopyState = $state<"idle" | "copied" | "failed">("idle");
-	let boardShotCopyToken = $state(0);
 	$effect(() => {
 		if (typeof window === "undefined") return;
 
@@ -1129,16 +1127,6 @@
 		};
 	});
 
-	const showBoardShotCopyState = (next: "copied" | "failed"): void => {
-		boardShotCopyState = next;
-		boardShotCopyToken += 1;
-		const token = boardShotCopyToken;
-		window.setTimeout(() => {
-			if (boardShotCopyToken !== token) return;
-			boardShotCopyState = "idle";
-		}, 1200);
-	};
-
 	const loadImageFromUrl = (url: string): Promise<HTMLImageElement> =>
 		new Promise((resolve, reject) => {
 			const img = new Image();
@@ -1151,13 +1139,12 @@
 		if (typeof window === "undefined") return;
 		if (!svg) return;
 		if (!navigator.clipboard || typeof ClipboardItem === "undefined") {
-			showBoardShotCopyState("failed");
+			console.warn("clipboard API not available");
 			return;
 		}
 
 		const rect = svg.getBoundingClientRect();
 		if (rect.width <= 0 || rect.height <= 0) {
-			showBoardShotCopyState("failed");
 			return;
 		}
 
@@ -1174,7 +1161,6 @@
 		canvas.height = hPx;
 		const ctx = canvas.getContext("2d");
 		if (!ctx) {
-			showBoardShotCopyState("failed");
 			return;
 		}
 
@@ -1233,7 +1219,6 @@
 
 		if (!ok || !img) {
 			console.warn("failed to render svg", err);
-			showBoardShotCopyState("failed");
 			return;
 		}
 
@@ -1255,7 +1240,6 @@
 		}
 		if (!ok2 || !pngBlob) {
 			console.warn("failed to create png", err2);
-			showBoardShotCopyState("failed");
 			return;
 		}
 
@@ -1273,11 +1257,8 @@
 
 		if (!ok3) {
 			console.warn("failed to write clipboard", err3);
-			showBoardShotCopyState("failed");
 			return;
 		}
-
-		showBoardShotCopyState("copied");
 	};
 
 	const colorStorageKeyP1 = "continuous-connection-game.color.p1";
@@ -3106,7 +3087,6 @@
 				{isMultiplayerEnabled}
 				setMultiplayerEnabled={(next) => setMultiplayerEnabled?.(next)}
 				{copyBoardShot}
-				{boardShotCopyState}
 				{turnPlayer}
 				extraInfoEnabled={isExtraInfoEnabled}
 				setExtraInfoEnabled={(next) => {
