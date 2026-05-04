@@ -371,17 +371,40 @@
 		</div>
 
 		<div class="buttons" style:margin-top="10px">
-			<button class="btn" disabled={isUndoDisabled} onclick={undo}>undo</button>
+			<button class="btn" disabled={isUndoDisabled} onclick={undo}>
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path
+						d="M9 7H5v4l1.6-1.6A7 7 0 1 1 5 12h2a5 5 0 1 0 1.5-3.5L9 7Z"
+						fill="currentColor"
+						opacity="0.9"
+					/>
+				</svg>
+				undo
+			</button>
 			{#if isSwapShown}
-				<button class="btn" disabled={isSwapDisabled} onclick={swap}
-					>swap</button
-				>
+				<button class="btn" disabled={isSwapDisabled} onclick={swap}>
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M7 7h10l-2-2 1.4-1.4L21 8l-4.6 4.4L15 11l2-2H7V7Zm10 10H7l2 2-1.4 1.4L3 16l4.6-4.4L9 13l-2 2h10v2Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					</svg>
+					swap
+				</button>
 			{/if}
 			<button
 				class="btn btnDanger"
 				title="Reset to a new game"
 				onclick={newGame}
 			>
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path
+						d="M7 6h10l-1 14H8L7 6Zm2-2h6l1 2H8l1-2Z"
+						fill="currentColor"
+						opacity="0.9"
+					/>
+				</svg>
 				new game
 			</button>
 		</div>
