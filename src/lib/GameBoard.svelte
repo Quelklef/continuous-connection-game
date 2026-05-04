@@ -2969,6 +2969,19 @@
 						false,
 						0.75,
 					)}
+					{#if isRotationEnabled}
+						<circle
+							cx={mouseLoc[0]}
+							cy={mouseLoc[1]}
+							r={Math.SQRT2 / 2}
+							fill="none"
+							stroke="black"
+							stroke-opacity="0.75"
+							stroke-width="2"
+							vector-effect="non-scaling-stroke"
+							style:pointer-events="none"
+						></circle>
+					{/if}
 				{/if}
 
 				{#each movesForStones as move (move.i)}
