@@ -3068,6 +3068,23 @@
 				{boardShotCopyState}
 				{turnText}
 				{turnColor}
+				extraInfoEnabled={isExtraInfoEnabled}
+				setExtraInfoEnabled={(next) => {
+					isExtraInfoToggled = isExtraInfoHeld !== next;
+				}}
+				rotationEnabled={isRotationEnabled}
+				setRotationEnabled={(next) => {
+					isRotationToggled = isRotationHeld !== next;
+				}}
+				bordersShown={isBordersShown}
+				setBordersShown={(next) => {
+					isComponentOutlinesEnabled = isBordersHeld !== next;
+				}}
+				futureEnabled={isFutureEnabled}
+				setFutureEnabled={(next) => {
+					isFutureToggled = isFutureHeld !== next;
+				}}
+				isFutureToggleDisabled={playerMode === 1}
 				{clockStarted}
 				{clockPaused}
 				clockEnabled={clockSettings.enabled}

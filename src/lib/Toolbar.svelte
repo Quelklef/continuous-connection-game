@@ -32,6 +32,16 @@
 
 		isComponentOutlinesEnabled: boolean;
 
+		extraInfoEnabled: boolean;
+		setExtraInfoEnabled: (next: boolean) => void;
+		rotationEnabled: boolean;
+		setRotationEnabled: (next: boolean) => void;
+		bordersShown: boolean;
+		setBordersShown: (next: boolean) => void;
+		futureEnabled: boolean;
+		setFutureEnabled: (next: boolean) => void;
+		isFutureToggleDisabled: boolean;
+
 		wsUrl: string;
 		wsUrlDraft: string;
 		wsUrlError: string | null;
@@ -88,6 +98,16 @@
 		applyBoardSize,
 
 		isComponentOutlinesEnabled = $bindable(),
+
+		extraInfoEnabled,
+		setExtraInfoEnabled,
+		rotationEnabled,
+		setRotationEnabled,
+		bordersShown,
+		setBordersShown,
+		futureEnabled,
+		setFutureEnabled,
+		isFutureToggleDisabled,
 
 		wsUrl,
 		wsUrlDraft = $bindable(""),
@@ -282,15 +302,6 @@
 					{turnText}
 				</div>
 			</div>
-			<label class="kv kvLabel" style:margin-top="8px">
-				<span class="muted">component borders</span>
-				<input
-					class="check"
-					type="checkbox"
-					aria-label="Toggle connected component borders"
-					bind:checked={isComponentOutlinesEnabled}
-				/>
-			</label>
 			<div class="kv" style:margin-top="8px">
 				<div class="muted">screenshot</div>
 				<div class="shotRight">
@@ -530,6 +541,55 @@
 		<div class="section">
 			<div class="sectionTitle">
 				<div>actions</div>
+			</div>
+			<div class="modeToggles" aria-label="Mode toggles">
+				<label class="modeToggle">
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Toggle extra info"
+						checked={extraInfoEnabled}
+						onchange={(e) =>
+							setExtraInfoEnabled(
+								(e.currentTarget as HTMLInputElement).checked,
+							)}
+					/>
+					<span class="muted">extra</span>
+				</label>
+				<label class="modeToggle">
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Toggle rotation mode"
+						checked={rotationEnabled}
+						onchange={(e) =>
+							setRotationEnabled((e.currentTarget as HTMLInputElement).checked)}
+					/>
+					<span class="muted">rotate</span>
+				</label>
+				<label class="modeToggle">
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Toggle component borders"
+						checked={bordersShown}
+						onchange={(e) =>
+							setBordersShown((e.currentTarget as HTMLInputElement).checked)}
+					/>
+					<span class="muted">borders</span>
+				</label>
+				<label class="modeToggle">
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Toggle future mode"
+						checked={futureEnabled}
+						disabled={isFutureToggleDisabled}
+						onchange={(e) =>
+							setFutureEnabled((e.currentTarget as HTMLInputElement).checked)}
+					/>
+					<span class="muted">future</span>
+				</label>
 			</div>
 			<div class="buttons">
 				<button class="btn" disabled={isUndoDisabled} onclick={undo}>
@@ -1104,6 +1164,20 @@
 		letter-spacing: 0.2px;
 	}
 
+	.modeToggles {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 6px 10px;
+		margin-bottom: 8px;
+	}
+
+	.modeToggle {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		user-select: none;
+	}
+
 	.timerTop {
 		display: flex;
 		align-items: flex-end;
@@ -1240,11 +1314,6 @@
 	.btnDanger:hover {
 		border-color: rgba(180, 20, 40, 0.4);
 		background: rgba(255, 240, 242, 0.95);
-	}
-
-	.kvLabel {
-		cursor: pointer;
-		user-select: none;
 	}
 
 	label {
