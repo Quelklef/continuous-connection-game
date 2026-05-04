@@ -1803,6 +1803,7 @@
 		resetHistory();
 		viewBox = { x: 0, y: 0, w: size, h: size };
 		isPreviewMode = false;
+		resetClock(clockSettings);
 		stagedBaseline = null;
 		hasStagedBaselineChanges = false;
 		sharedOverlay = emptyOverlayState();
