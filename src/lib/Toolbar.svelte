@@ -479,7 +479,7 @@
 			<div class="keyRow">
 				<div>zoom</div>
 				<div class="keyRowRight">
-					<div class="muted">[{Math.round(zoomX * 100) / 100}×]</div>
+					<div class="muted">{Math.round(zoomX * 100) / 100}×</div>
 					<button
 						class="iconBtn"
 						title={isZoomAtOneX ? "Already at 1×" : "Reset view"}
