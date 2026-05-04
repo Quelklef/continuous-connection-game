@@ -268,471 +268,20 @@
 	};
 </script>
 
-<div class="toolbar">
-	<div class="sections">
-		<div class="section">
-			<div class="kv">
-				<div class="muted">zoom</div>
-				<div class="zoomValue">
-					<div>{Math.round(zoomX * 100) / 100}×</div>
-					<button
-						class="iconBtn"
-						title={isZoomAtOneX ? "Already at 1×" : "Reset view"}
-						aria-label="Reset view"
-						disabled={isZoomAtOneX}
-						onclick={resetView}
-					>
-						<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-							<path
-								d="M6.2 8.5A7 7 0 1 1 5 12h2a5 5 0 1 0 1.2-3.2L10 10.6V5H5l1.2 1.2Z"
-								fill="currentColor"
-								opacity="0.9"
-							/>
-						</svg>
-					</button>
-				</div>
-			</div>
-			<div class="kv" style:margin-top="8px">
-				<div class="muted">moves played</div>
-				<div>{movesPlayed}</div>
-			</div>
-			<div class="kv" style:margin-top="8px">
-				<div class="muted">turn</div>
-				<div class="turnInline" style:color={turnColor}>
-					{turnText}
-				</div>
-			</div>
-			<div class="kv" style:margin-top="8px">
-				<div class="muted">screenshot</div>
-				<div class="shotRight">
-					<button
-						class="iconBtn"
-						title="Copy a screenshot of the board to clipboard"
-						aria-label="Copy board screenshot"
-						onclick={copyBoardShot}
-					>
-						<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-							<path
-								d="M9 4.5h6l1.2 1.6H19A2.5 2.5 0 0 1 21.5 8.6v8.8A2.5 2.5 0 0 1 19 19.9H5A2.5 2.5 0 0 1 2.5 17.4V8.6A2.5 2.5 0 0 1 5 6.1h2.8L9 4.5Zm3 3.2a4.1 4.1 0 1 0 0 8.2a4.1 4.1 0 0 0 0-8.2Zm0 2a2.1 2.1 0 1 1 0 4.2a2.1 2.1 0 0 1 0-4.2Z"
-								fill="currentColor"
-								opacity="0.9"
-							/>
-						</svg>
-					</button>
-					{#if boardShotCopyState !== "idle"}
-						<div class="shotStatus" class:ok={boardShotCopyState === "copied"}>
-							{boardShotCopyState === "copied" ? "copied" : "failed"}
-						</div>
-					{/if}
-				</div>
-			</div>
-		</div>
-
-		<div class="section">
-			<div class="sectionTitle">
-				<div>board size</div>
-			</div>
-			<div class="stepper" aria-label="Board size">
-				<button
-					class="stepBtn"
-					title="Decrease board size"
-					aria-label="Decrease board size"
-					disabled={size <= minBoardSize}
-					onclick={() => applyBoardSize(size - 1)}
-				>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M6.5 12.9h11v-1.8h-11v1.8Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-				</button>
-				<button
-					type="button"
-					class="stepValue"
-					aria-label="Current board size"
-					title="Click to edit"
-					onclick={beginEditSize}
-				>
-					{#if isSizeEditing}
-						<input
-							bind:this={sizeInput}
-							class="stepValueInput"
-							type="text"
-							inputmode="numeric"
-							autocomplete="off"
-							aria-label="Board size in stones"
-							bind:value={sizeDraft}
-							onblur={commitEditSize}
-							onkeydown={(e) => {
-								if (e.key === "Enter") {
-									e.preventDefault();
-									commitEditSize();
-								} else if (e.key === "Escape") {
-									e.preventDefault();
-									cancelEditSize();
-								}
-							}}
-						/>
-					{:else}
-						<div class="stepValueNumber">{size}</div>
-					{/if}
-					<div class="stepValueLabel">stones</div>
-				</button>
-				<button
-					class="stepBtn"
-					title="Increase board size"
-					aria-label="Increase board size"
-					disabled={size >= maxBoardSize}
-					onclick={() => applyBoardSize(size + 1)}
-				>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M11.1 6.5v4.6H6.5v1.8h4.6v4.6h1.8v-4.6h4.6v-1.8h-4.6V6.5h-1.8Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-				</button>
-			</div>
-		</div>
-
-		{#if isWsConfigShown}
-			<div class="section">
-				<div class="sectionTitle">
-					<div>multiplayer</div>
-					<label class="sectionEnable">
-						<input
-							class="check"
-							type="checkbox"
-							aria-label="Enable multiplayer"
-							checked={isMultiplayerEnabled}
-							onchange={(e) =>
-								setMultiplayerEnabled(
-									(e.currentTarget as HTMLInputElement).checked,
-								)}
-						/>
-						<span class="muted">enable</span>
-					</label>
-				</div>
-				<div class="wsStatus" aria-label="Multiplayer connection status">
-					<div class="muted">status</div>
-					<div class="wsStatusRight">
-						<div class="wsStatusText">{wsStatus}</div>
-						<span
-							class="wsDot"
-							class:online={wsStatus === "online"}
-							class:connecting={wsStatus === "connecting"}
-						></span>
-					</div>
-				</div>
-				<div class="wsEditor" style:margin-top="8px">
-					<div class="wsEditorMain">
-						<div class="wsEditorShell">
-							<input
-								class="wsInput"
-								aria-label="WebSocket URL"
-								bind:value={wsUrlDraft}
-								placeholder="ws://localhost:8090"
-								onkeydown={onWsInputKeyDown}
-							/>
-							{#if isWsDirty}
-								<div class="wsEditorButtons">
-									<button
-										class="wsAttachBtn wsAttachLeft"
-										disabled={!wsUrlDraft.trim()}
-										onclick={connectToDraftUrl}
-									>
-										connect
-									</button>
-									<button
-										class="wsAttachBtn wsAttachRight"
-										onclick={cancelWsEdit}
-									>
-										cancel
-									</button>
-								</div>
-							{/if}
-						</div>
-					</div>
-					<button
-						class="wsSaveIconBtn"
-						title="Save WebSocket target to URL"
-						aria-label="Save WebSocket target to URL"
-						onclick={saveWsTargetToUrl}
-					>
-						<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-							<path
-								d="M6 4.5h10.6L20.5 8.4V19A1.5 1.5 0 0 1 19 20.5H6A1.5 1.5 0 0 1 4.5 19V6A1.5 1.5 0 0 1 6 4.5Zm0 2V19h13V9.2l-2.8-2.7H6Zm2 1.5h6v4H8v-4Zm0 8h8v3H8v-3Z"
-								fill="currentColor"
-								opacity="0.9"
-							/>
-						</svg>
-					</button>
-				</div>
-				{#if wsUrlError}
-					<div class="wsError">{wsUrlError}</div>
-				{/if}
-			</div>
-		{/if}
-
-		<div class="section">
-			<div class="sectionTitle">
-				<div>turn timer</div>
-				<label class="sectionEnable">
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Enable turn timer"
-						checked={clockEnabled}
-						onchange={toggleClockEnabled}
-					/>
-					<span class="muted">enable</span>
-				</label>
-			</div>
-			<div class="timerTop">
-				<div class="timerParams">
-					<label class="timerParam">
-						<span class="muted">total</span>
-						<input
-							class="timerInput"
-							inputmode="numeric"
-							aria-label="Turn timer total seconds"
-							bind:value={totalSecondsDraft}
-							onblur={commitTotal}
-							onkeydown={(e) => {
-								if (e.key === "Enter") commitTotal();
-							}}
-						/>
-					</label>
-					<label class="timerParam">
-						<span class="muted">gain</span>
-						<input
-							class="timerInput"
-							inputmode="numeric"
-							aria-label="Turn timer gain seconds"
-							bind:value={gainSecondsDraft}
-							onblur={commitGain}
-							onkeydown={(e) => {
-								if (e.key === "Enter") commitGain();
-							}}
-						/>
-					</label>
-				</div>
+{#snippet topSection()}
+	<div class="section">
+		<div class="kv">
+			<div class="muted">zoom</div>
+			<div class="zoomValue">
+				<div>{Math.round(zoomX * 100) / 100}×</div>
 				<button
 					class="iconBtn"
-					disabled={!clockEnabled}
-					title={clockPaused ? "Resume turn timer" : "Pause turn timer"}
-					aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
-					onclick={toggleClockPaused}
+					title={isZoomAtOneX ? "Already at 1×" : "Reset view"}
+					aria-label="Reset view"
+					disabled={isZoomAtOneX}
+					onclick={resetView}
 				>
 					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						{#if clockPaused}
-							<path
-								d="M9 7.2v9.6L17.4 12 9 7.2Z"
-								fill="currentColor"
-								opacity="0.9"
-							/>
-						{:else}
-							<path
-								d="M7.5 6.5h3v11h-3v-11Zm6 0h3v11h-3v-11Z"
-								fill="currentColor"
-								opacity="0.9"
-							/>
-						{/if}
-					</svg>
-				</button>
-			</div>
-			<div class="timerGrid" aria-label="Turn timer">
-				<div class="timerHalf" class:active={clockActivePlayer === 1}>
-					<div class="timerPlayer muted">p1</div>
-					<div class="timerValue" class:overtime={clockRemainingMsP1 < 0}>
-						{formatMs(clockRemainingMsP1)}
-					</div>
-				</div>
-				<div class="timerHalf" class:active={clockActivePlayer === 2}>
-					<div class="timerPlayer muted">p2</div>
-					<div class="timerValue" class:overtime={clockRemainingMsP2 < 0}>
-						{formatMs(clockRemainingMsP2)}
-					</div>
-				</div>
-			</div>
-			{#if !clockEnabled}
-				<div class="timerNote muted">disabled</div>
-			{:else if !clockStarted}
-				<div class="timerNote muted">starts after p1’s first move</div>
-			{/if}
-		</div>
-
-		<div class="section">
-			<div class="sectionTitle">
-				<div>game actions</div>
-			</div>
-			<div class="buttons">
-				<button class="btn" disabled={isUndoDisabled} onclick={undo}>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M9 7H5v4l1.6-1.6A7 7 0 1 1 5 12h2a5 5 0 1 0 1.5-3.5L9 7Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-					undo
-				</button>
-				{#if isSwapShown}
-					<button class="btn" disabled={isSwapDisabled} onclick={swap}>
-						<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-							<path
-								d="M7 7h10l-2-2 1.4-1.4L21 8l-4.6 4.4L15 11l2-2H7V7Zm10 10H7l2 2-1.4 1.4L3 16l4.6-4.4L9 13l-2 2h10v2Z"
-								fill="currentColor"
-								opacity="0.9"
-							/>
-						</svg>
-						switch
-					</button>
-				{/if}
-				<button
-					class="btn btnDanger"
-					title="Reset to a new game"
-					onclick={newGame}
-				>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M7 6h10l-1 14H8L7 6Zm2-2h6l1 2H8l1-2Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-					new game
-				</button>
-			</div>
-		</div>
-
-		<div class="section">
-			<div class="sectionTitle">
-				<div>modes</div>
-			</div>
-			<div class="shortcutList" aria-label="Modes">
-				<div class="keycap">e</div>
-				<div class="modeCell">
-					<div>show extra info</div>
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Toggle extra info"
-						checked={extraInfoEnabled}
-						onchange={(e) =>
-							setExtraInfoEnabled(
-								(e.currentTarget as HTMLInputElement).checked,
-							)}
-					/>
-				</div>
-
-				<div class="keycap">r</div>
-				<div class="modeCell">
-					<div class="modeCellLeft">
-						<div>stone rotation mode</div>
-						<div class="modeHint">hold ctrl for finer rotation</div>
-					</div>
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Toggle stone rotation mode"
-						checked={rotationEnabled}
-						onchange={(e) =>
-							setRotationEnabled((e.currentTarget as HTMLInputElement).checked)}
-					/>
-				</div>
-
-				<div class="keycap">b</div>
-				<div class="modeCell">
-					<div>show component borders</div>
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Toggle component borders"
-						checked={bordersShown}
-						onchange={(e) =>
-							setBordersShown((e.currentTarget as HTMLInputElement).checked)}
-					/>
-				</div>
-
-				<div class="keycap">f</div>
-				<div class="modeCell">
-					<div>preview future moves</div>
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Toggle future move preview"
-						checked={futureEnabled}
-						disabled={isFutureToggleDisabled}
-						onchange={(e) =>
-							setFutureEnabled((e.currentTarget as HTMLInputElement).checked)}
-					/>
-				</div>
-			</div>
-			<div class="modeNote">hold the key, or use shift+key to toggle</div>
-		</div>
-
-		<div class="section">
-			<div class="sectionTitle">
-				<div>keybindings</div>
-			</div>
-			<div class="shortcutList">
-				<div class="keycap">scroll</div>
-				<div>zoom</div>
-				<div class="keycap">right-drag</div>
-				<div>pan</div>
-				{#if isMultiplayerEnabled}
-					<div class="keycap">f mode + ctrl</div>
-					<div>shared preview (send/receive)</div>
-				{/if}
-			</div>
-		</div>
-
-		<div class="section">
-			<div class="sectionTitle">
-				<div>player colors</div>
-			</div>
-
-			<div class="colorRow" title={resetColorsTitle}>
-				<div class="colorInline">
-					<div class="colorSwatch">
-						<span class="swatchDot" style:background={player1Color}></span>
-						<div class="muted">p1</div>
-					</div>
-					<input
-						class="colorInput"
-						type="color"
-						aria-label="player 1 color"
-						bind:value={player1Color}
-						onchange={commitColors}
-					/>
-				</div>
-
-				<div class="colorInline">
-					<div class="colorSwatch">
-						<span class="swatchDot" style:background={player2Color}></span>
-						<div class="muted">p2</div>
-					</div>
-					<input
-						class="colorInput"
-						type="color"
-						aria-label="player 2 color"
-						bind:value={player2Color}
-						onchange={commitColors}
-					/>
-				</div>
-
-				<button
-					class="iconBtn"
-					disabled={isResetColorsDisabled}
-					title={resetColorsTitle}
-					aria-label="Reset colors"
-					onclick={resetColors}
-				>
-					<svg class="icon iconLarge" viewBox="0 0 24 24" aria-hidden="true">
 						<path
 							d="M6.2 8.5A7 7 0 1 1 5 12h2a5 5 0 1 0 1.2-3.2L10 10.6V5H5l1.2 1.2Z"
 							fill="currentColor"
@@ -742,6 +291,480 @@
 				</button>
 			</div>
 		</div>
+		<div class="kv" style:margin-top="8px">
+			<div class="muted">moves played</div>
+			<div>{movesPlayed}</div>
+		</div>
+		<div class="kv" style:margin-top="8px">
+			<div class="muted">turn</div>
+			<div class="turnInline" style:color={turnColor}>
+				{turnText}
+			</div>
+		</div>
+		<div class="kv" style:margin-top="8px">
+			<div class="muted">screenshot</div>
+			<div class="shotRight">
+				<button
+					class="iconBtn"
+					title="Copy a screenshot of the board to clipboard"
+					aria-label="Copy board screenshot"
+					onclick={copyBoardShot}
+				>
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M9 4.5h6l1.2 1.6H19A2.5 2.5 0 0 1 21.5 8.6v8.8A2.5 2.5 0 0 1 19 19.9H5A2.5 2.5 0 0 1 2.5 17.4V8.6A2.5 2.5 0 0 1 5 6.1h2.8L9 4.5Zm3 3.2a4.1 4.1 0 1 0 0 8.2a4.1 4.1 0 0 0 0-8.2Zm0 2a2.1 2.1 0 1 1 0 4.2a2.1 2.1 0 0 1 0-4.2Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					</svg>
+				</button>
+				{#if boardShotCopyState !== "idle"}
+					<div class="shotStatus" class:ok={boardShotCopyState === "copied"}>
+						{boardShotCopyState === "copied" ? "copied" : "failed"}
+					</div>
+				{/if}
+			</div>
+		</div>
+	</div>
+{/snippet}
+
+{#snippet boardSizeSection()}
+	<div class="section">
+		<div class="sectionTitle">
+			<div>board size</div>
+		</div>
+		<div class="stepper" aria-label="Board size">
+			<button
+				class="stepBtn"
+				title="Decrease board size"
+				aria-label="Decrease board size"
+				disabled={size <= minBoardSize}
+				onclick={() => applyBoardSize(size - 1)}
+			>
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path
+						d="M6.5 12.9h11v-1.8h-11v1.8Z"
+						fill="currentColor"
+						opacity="0.9"
+					/>
+				</svg>
+			</button>
+			<button
+				type="button"
+				class="stepValue"
+				aria-label="Current board size"
+				title="Click to edit"
+				onclick={beginEditSize}
+			>
+				{#if isSizeEditing}
+					<input
+						bind:this={sizeInput}
+						class="stepValueInput"
+						type="text"
+						inputmode="numeric"
+						autocomplete="off"
+						aria-label="Board size in stones"
+						bind:value={sizeDraft}
+						onblur={commitEditSize}
+						onkeydown={(e) => {
+							if (e.key === "Enter") {
+								e.preventDefault();
+								commitEditSize();
+							} else if (e.key === "Escape") {
+								e.preventDefault();
+								cancelEditSize();
+							}
+						}}
+					/>
+				{:else}
+					<div class="stepValueNumber">{size}</div>
+				{/if}
+				<div class="stepValueLabel">stones</div>
+			</button>
+			<button
+				class="stepBtn"
+				title="Increase board size"
+				aria-label="Increase board size"
+				disabled={size >= maxBoardSize}
+				onclick={() => applyBoardSize(size + 1)}
+			>
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path
+						d="M11.1 6.5v4.6H6.5v1.8h4.6v4.6h1.8v-4.6h4.6v-1.8h-4.6V6.5h-1.8Z"
+						fill="currentColor"
+						opacity="0.9"
+					/>
+				</svg>
+			</button>
+		</div>
+	</div>
+{/snippet}
+
+{#snippet multiplayerSection()}
+	{#if isWsConfigShown}
+		<div class="section">
+			<div class="sectionTitle">
+				<div>multiplayer</div>
+				<label class="sectionEnable">
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Enable multiplayer"
+						checked={isMultiplayerEnabled}
+						onchange={(e) =>
+							setMultiplayerEnabled(
+								(e.currentTarget as HTMLInputElement).checked,
+							)}
+					/>
+					<span class="muted">enable</span>
+				</label>
+			</div>
+			<div class="wsStatus" aria-label="Multiplayer connection status">
+				<div class="muted">status</div>
+				<div class="wsStatusRight">
+					<div class="wsStatusText">{wsStatus}</div>
+					<span
+						class="wsDot"
+						class:online={wsStatus === "online"}
+						class:connecting={wsStatus === "connecting"}
+					></span>
+				</div>
+			</div>
+			<div class="wsEditor" style:margin-top="8px">
+				<div class="wsEditorMain">
+					<div class="wsEditorShell">
+						<input
+							class="wsInput"
+							aria-label="WebSocket URL"
+							bind:value={wsUrlDraft}
+							placeholder="ws://localhost:8090"
+							onkeydown={onWsInputKeyDown}
+						/>
+						{#if isWsDirty}
+							<div class="wsEditorButtons">
+								<button
+									class="wsAttachBtn wsAttachLeft"
+									disabled={!wsUrlDraft.trim()}
+									onclick={connectToDraftUrl}
+								>
+									connect
+								</button>
+								<button
+									class="wsAttachBtn wsAttachRight"
+									onclick={cancelWsEdit}
+								>
+									cancel
+								</button>
+							</div>
+						{/if}
+					</div>
+				</div>
+				<button
+					class="wsSaveIconBtn"
+					title="Save WebSocket target to URL"
+					aria-label="Save WebSocket target to URL"
+					onclick={saveWsTargetToUrl}
+				>
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M6 4.5h10.6L20.5 8.4V19A1.5 1.5 0 0 1 19 20.5H6A1.5 1.5 0 0 1 4.5 19V6A1.5 1.5 0 0 1 6 4.5Zm0 2V19h13V9.2l-2.8-2.7H6Zm2 1.5h6v4H8v-4Zm0 8h8v3H8v-3Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					</svg>
+				</button>
+			</div>
+			{#if wsUrlError}
+				<div class="wsError">{wsUrlError}</div>
+			{/if}
+		</div>
+	{/if}
+{/snippet}
+
+{#snippet turnTimerSection()}
+	<div class="section">
+		<div class="sectionTitle">
+			<div>turn timer</div>
+			<label class="sectionEnable">
+				<input
+					class="check"
+					type="checkbox"
+					aria-label="Enable turn timer"
+					checked={clockEnabled}
+					onchange={toggleClockEnabled}
+				/>
+				<span class="muted">enable</span>
+			</label>
+		</div>
+		<div class="timerTop">
+			<div class="timerParams">
+				<label class="timerParam">
+					<span class="muted">total</span>
+					<input
+						class="timerInput"
+						inputmode="numeric"
+						aria-label="Turn timer total seconds"
+						bind:value={totalSecondsDraft}
+						onblur={commitTotal}
+						onkeydown={(e) => {
+							if (e.key === "Enter") commitTotal();
+						}}
+					/>
+				</label>
+				<label class="timerParam">
+					<span class="muted">gain</span>
+					<input
+						class="timerInput"
+						inputmode="numeric"
+						aria-label="Turn timer gain seconds"
+						bind:value={gainSecondsDraft}
+						onblur={commitGain}
+						onkeydown={(e) => {
+							if (e.key === "Enter") commitGain();
+						}}
+					/>
+				</label>
+			</div>
+			<button
+				class="iconBtn"
+				disabled={!clockEnabled}
+				title={clockPaused ? "Resume turn timer" : "Pause turn timer"}
+				aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
+				onclick={toggleClockPaused}
+			>
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+					{#if clockPaused}
+						<path
+							d="M9 7.2v9.6L17.4 12 9 7.2Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					{:else}
+						<path
+							d="M7.5 6.5h3v11h-3v-11Zm6 0h3v11h-3v-11Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					{/if}
+				</svg>
+			</button>
+		</div>
+		<div class="timerGrid" aria-label="Turn timer">
+			<div class="timerHalf" class:active={clockActivePlayer === 1}>
+				<div class="timerPlayer muted">p1</div>
+				<div class="timerValue" class:overtime={clockRemainingMsP1 < 0}>
+					{formatMs(clockRemainingMsP1)}
+				</div>
+			</div>
+			<div class="timerHalf" class:active={clockActivePlayer === 2}>
+				<div class="timerPlayer muted">p2</div>
+				<div class="timerValue" class:overtime={clockRemainingMsP2 < 0}>
+					{formatMs(clockRemainingMsP2)}
+				</div>
+			</div>
+		</div>
+		{#if !clockEnabled}
+			<div class="timerNote muted">disabled</div>
+		{:else if !clockStarted}
+			<div class="timerNote muted">starts after p1’s first move</div>
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet gameActionsSection()}
+	<div class="section">
+		<div class="sectionTitle">
+			<div>game actions</div>
+		</div>
+		<div class="buttons">
+			<button class="btn" disabled={isUndoDisabled} onclick={undo}>
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path
+						d="M9 7H5v4l1.6-1.6A7 7 0 1 1 5 12h2a5 5 0 1 0 1.5-3.5L9 7Z"
+						fill="currentColor"
+						opacity="0.9"
+					/>
+				</svg>
+				undo
+			</button>
+			{#if isSwapShown}
+				<button class="btn" disabled={isSwapDisabled} onclick={swap}>
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path
+							d="M7 7h10l-2-2 1.4-1.4L21 8l-4.6 4.4L15 11l2-2H7V7Zm10 10H7l2 2-1.4 1.4L3 16l4.6-4.4L9 13l-2 2h10v2Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					</svg>
+					switch
+				</button>
+			{/if}
+			<button
+				class="btn btnDanger"
+				title="Reset to a new game"
+				onclick={newGame}
+			>
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path
+						d="M7 6h10l-1 14H8L7 6Zm2-2h6l1 2H8l1-2Z"
+						fill="currentColor"
+						opacity="0.9"
+					/>
+				</svg>
+				new game
+			</button>
+		</div>
+	</div>
+{/snippet}
+
+{#snippet modesSection()}
+	<div class="section">
+		<div class="sectionTitle">
+			<div>modes</div>
+		</div>
+		<div class="shortcutList" aria-label="Modes">
+			<div class="keycap">e</div>
+			<div class="modeCell">
+				<div>show extra info</div>
+				<input
+					class="check"
+					type="checkbox"
+					aria-label="Toggle extra info"
+					checked={extraInfoEnabled}
+					onchange={(e) =>
+						setExtraInfoEnabled((e.currentTarget as HTMLInputElement).checked)}
+				/>
+			</div>
+
+			<div class="keycap">r</div>
+			<div class="modeCell">
+				<div class="modeCellLeft">
+					<div>stone rotation mode</div>
+					<div class="modeHint">hold ctrl for finer rotation</div>
+				</div>
+				<input
+					class="check"
+					type="checkbox"
+					aria-label="Toggle stone rotation mode"
+					checked={rotationEnabled}
+					onchange={(e) =>
+						setRotationEnabled((e.currentTarget as HTMLInputElement).checked)}
+				/>
+			</div>
+
+			<div class="keycap">b</div>
+			<div class="modeCell">
+				<div>show component borders</div>
+				<input
+					class="check"
+					type="checkbox"
+					aria-label="Toggle component borders"
+					checked={bordersShown}
+					onchange={(e) =>
+						setBordersShown((e.currentTarget as HTMLInputElement).checked)}
+				/>
+			</div>
+
+			<div class="keycap">f</div>
+			<div class="modeCell">
+				<div>preview future moves</div>
+				<input
+					class="check"
+					type="checkbox"
+					aria-label="Toggle future move preview"
+					checked={futureEnabled}
+					disabled={isFutureToggleDisabled}
+					onchange={(e) =>
+						setFutureEnabled((e.currentTarget as HTMLInputElement).checked)}
+				/>
+			</div>
+		</div>
+		<div class="modeNote">hold the key, or use shift+key to toggle</div>
+	</div>
+{/snippet}
+
+{#snippet keybindingsSection()}
+	<div class="section">
+		<div class="sectionTitle">
+			<div>keybindings</div>
+		</div>
+		<div class="shortcutList">
+			<div class="keycap">scroll</div>
+			<div>zoom</div>
+			<div class="keycap">right-drag</div>
+			<div>pan</div>
+			{#if isMultiplayerEnabled}
+				<div class="keycap">f mode + ctrl</div>
+				<div>shared preview (send/receive)</div>
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet playerColorsSection()}
+	<div class="section">
+		<div class="sectionTitle">
+			<div>player colors</div>
+		</div>
+
+		<div class="colorRow" title={resetColorsTitle}>
+			<div class="colorInline">
+				<div class="colorSwatch">
+					<span class="swatchDot" style:background={player1Color}></span>
+					<div class="muted">p1</div>
+				</div>
+				<input
+					class="colorInput"
+					type="color"
+					aria-label="player 1 color"
+					bind:value={player1Color}
+					onchange={commitColors}
+				/>
+			</div>
+
+			<div class="colorInline">
+				<div class="colorSwatch">
+					<span class="swatchDot" style:background={player2Color}></span>
+					<div class="muted">p2</div>
+				</div>
+				<input
+					class="colorInput"
+					type="color"
+					aria-label="player 2 color"
+					bind:value={player2Color}
+					onchange={commitColors}
+				/>
+			</div>
+
+			<button
+				class="iconBtn"
+				disabled={isResetColorsDisabled}
+				title={resetColorsTitle}
+				aria-label="Reset colors"
+				onclick={resetColors}
+			>
+				<svg class="icon iconLarge" viewBox="0 0 24 24" aria-hidden="true">
+					<path
+						d="M6.2 8.5A7 7 0 1 1 5 12h2a5 5 0 1 0 1.2-3.2L10 10.6V5H5l1.2 1.2Z"
+						fill="currentColor"
+						opacity="0.9"
+					/>
+				</svg>
+			</button>
+		</div>
+	</div>
+{/snippet}
+
+<div class="toolbar">
+	<div class="sections">
+		{@render topSection()}
+		{@render boardSizeSection()}
+		{@render multiplayerSection()}
+		{@render turnTimerSection()}
+		{@render gameActionsSection()}
+		{@render modesSection()}
+		{@render keybindingsSection()}
+		{@render playerColorsSection()}
 	</div>
 </div>
 
