@@ -574,24 +574,21 @@
 		<div class="sectionTitle">
 			<div>screenshot</div>
 		</div>
-		<div class="kv">
-			<div class="muted">screenshot</div>
-			<div class="shotRight">
-				<button
-					class="iconBtn"
-					title="Copy a screenshot of the board to clipboard"
-					aria-label="Copy board screenshot"
-					onclick={copyBoardShot}
-				>
-					copy
-				</button>
-				{#if boardShotCopyState !== "idle"}
-					<div class="shotStatus" class:ok={boardShotCopyState === "copied"}>
-						{boardShotCopyState === "copied" ? "copied" : "failed"}
-					</div>
-				{/if}
-			</div>
-		</div>
+		<button
+			class="btn"
+			title="Copy a screenshot of the board to clipboard"
+			aria-label="Take screenshot"
+			onclick={copyBoardShot}
+		>
+			<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+				<path
+					d="M9 4.5h6l1.2 1.6H19A2.5 2.5 0 0 1 21.5 8.6v8.8A2.5 2.5 0 0 1 19 19.9H5A2.5 2.5 0 0 1 2.5 17.4V8.6A2.5 2.5 0 0 1 5 6.1h2.8L9 4.5Zm3 3.2a4.1 4.1 0 1 0 0 8.2a4.1 4.1 0 0 0 0-8.2Zm0 2a2.1 2.1 0 1 1 0 4.2a2.1 2.1 0 0 1 0-4.2Z"
+					fill="currentColor"
+					opacity="0.9"
+				/>
+			</svg>
+			take screenshot
+		</button>
 	</div>
 {/snippet}
 
