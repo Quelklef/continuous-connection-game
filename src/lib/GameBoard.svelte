@@ -3011,7 +3011,16 @@
 									x2="0"
 									y2="0.16"
 									stroke="black"
-									stroke-opacity="0.35"
+									stroke-opacity="0.55"
+									stroke-width="0.035"
+								/>
+								<line
+									x1="0.08"
+									y1="0"
+									x2="0.08"
+									y2="0.16"
+									stroke="black"
+									stroke-opacity="0.55"
 									stroke-width="0.035"
 								/>
 							</pattern>
