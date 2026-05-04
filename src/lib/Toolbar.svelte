@@ -518,8 +518,11 @@
 
 			<div class="keycap">r</div>
 			<label class="modeRow modeLabel">
-				<div>
-					rotate stone <span class="modeTag">(mode)</span>
+				<div class="modeLabelLeft">
+					<div>
+						rotate stone <span class="modeTag">(mode)</span>
+					</div>
+					<div class="modeHintInline">hold ctrl for finer rotation</div>
 				</div>
 				<input
 					class="check"
@@ -530,9 +533,6 @@
 						setRotationEnabled((e.currentTarget as HTMLInputElement).checked)}
 				/>
 			</label>
-
-			<div class="keycap"></div>
-			<div class="muted">hold ctrl for finer rotation</div>
 
 			<div class="keycap">f</div>
 			<label class="modeRow modeLabel">
@@ -800,6 +800,18 @@
 		font-size: 11px;
 		opacity: 0.58;
 		font-style: italic;
+	}
+
+	.modeLabelLeft {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+
+	.modeHintInline {
+		font-size: 11px;
+		line-height: 1.2;
+		opacity: 0.62;
 	}
 
 	.wsEditor {
