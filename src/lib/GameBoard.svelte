@@ -3010,8 +3010,8 @@
 									x2="0.18"
 									y2="0.18"
 									stroke="black"
-									stroke-opacity="0.55"
-									stroke-width="0.035"
+									stroke-opacity="0.45"
+									stroke-width="0.065"
 								/>
 								<line
 									x1="0"
@@ -3019,7 +3019,25 @@
 									x2="0.18"
 									y2="0"
 									stroke="black"
-									stroke-opacity="0.55"
+									stroke-opacity="0.45"
+									stroke-width="0.065"
+								/>
+								<line
+									x1="0"
+									y1="0"
+									x2="0.18"
+									y2="0.18"
+									stroke="white"
+									stroke-opacity="0.82"
+									stroke-width="0.035"
+								/>
+								<line
+									x1="0"
+									y1="0.18"
+									x2="0.18"
+									y2="0"
+									stroke="white"
+									stroke-opacity="0.82"
 									stroke-width="0.035"
 								/>
 							</pattern>
