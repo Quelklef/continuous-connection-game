@@ -724,14 +724,6 @@
 	};
 
 	let turnPlayer = $derived(playerFromIndex(realMoveCount));
-	let turnColor = $derived(playerColor(turnPlayer));
-	let turnText = $derived(
-		(() => {
-			if (playerMode === 1) return `Turn: P${turnPlayer}`;
-			if (effectivePlayer === null) return "Turn: —";
-			return myTurn ? "Turn: YOURS" : "Turn: THEIRS";
-		})(),
-	);
 
 	const defaultClockSettings: ClockSettings = {
 		enabled: true,
@@ -3115,8 +3107,7 @@
 				setMultiplayerEnabled={(next) => setMultiplayerEnabled?.(next)}
 				{copyBoardShot}
 				{boardShotCopyState}
-				{turnText}
-				{turnColor}
+				{turnPlayer}
 				extraInfoEnabled={isExtraInfoEnabled}
 				setExtraInfoEnabled={(next) => {
 					isExtraInfoToggled = isExtraInfoHeld !== next;

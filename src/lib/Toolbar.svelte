@@ -8,8 +8,7 @@
 		copyBoardShot: () => void;
 		boardShotCopyState: "idle" | "copied" | "failed";
 
-		turnText: string;
-		turnColor: string;
+		turnPlayer: 1 | 2;
 
 		clockStarted: boolean;
 		clockPaused: boolean;
@@ -75,8 +74,7 @@
 		copyBoardShot,
 		boardShotCopyState,
 
-		turnText,
-		turnColor,
+		turnPlayer,
 
 		clockStarted,
 		clockPaused,
@@ -176,39 +174,6 @@
 		setClockGainMs(clampInt(parsed, 0, 24 * 60 * 60) * 1000);
 	};
 
-	let isSizeEditing = $state(false);
-	let sizeDraft = $state("");
-	let sizeInput: HTMLInputElement | null = $state(null);
-
-	const beginEditSize = (): void => {
-		isSizeEditing = true;
-		sizeDraft = String(size);
-	};
-
-	const cancelEditSize = (): void => {
-		isSizeEditing = false;
-		sizeDraft = "";
-	};
-
-	const commitEditSize = (): void => {
-		const parsed = Number.parseInt(sizeDraft.trim(), 10);
-		if (Number.isNaN(parsed)) {
-			cancelEditSize();
-			return;
-		}
-		applyBoardSize(parsed);
-		cancelEditSize();
-	};
-
-	$effect(() => {
-		if (!isSizeEditing) return;
-		queueMicrotask(() => {
-			if (!sizeInput) return;
-			sizeInput.focus();
-			sizeInput.select();
-		});
-	});
-
 	const connectToDraftUrl = (): void => {
 		saveWsUrl?.();
 		if (!isMultiplayerEnabled) setMultiplayerEnabled(true);
@@ -268,223 +233,52 @@
 	};
 </script>
 
-{#snippet topSection()}
+{#snippet gameStateSection()}
 	<div class="section">
+		<div class="sectionTitle">
+			<div>game state</div>
+		</div>
+
 		<div class="kv">
-			<div class="muted">zoom</div>
-			<div class="zoomValue">
-				<div>{Math.round(zoomX * 100) / 100}×</div>
+			<div class="muted">board size</div>
+			<div class="boardSizeRight">
+				<div class="boardSizeValue">[{size}]</div>
 				<button
 					class="iconBtn"
-					title={isZoomAtOneX ? "Already at 1×" : "Reset view"}
-					aria-label="Reset view"
-					disabled={isZoomAtOneX}
-					onclick={resetView}
+					title="Decrease board size"
+					aria-label="Decrease board size"
+					disabled={size <= minBoardSize}
+					onclick={() => applyBoardSize(size - 1)}
 				>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M6.2 8.5A7 7 0 1 1 5 12h2a5 5 0 1 0 1.2-3.2L10 10.6V5H5l1.2 1.2Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
+					-
+				</button>
+				<button
+					class="iconBtn"
+					title="Increase board size"
+					aria-label="Increase board size"
+					disabled={size >= maxBoardSize}
+					onclick={() => applyBoardSize(size + 1)}
+				>
+					+
 				</button>
 			</div>
 		</div>
-		<div class="kv" style:margin-top="8px">
-			<div class="muted">moves played</div>
-			<div>{movesPlayed}</div>
-		</div>
+
 		<div class="kv" style:margin-top="8px">
 			<div class="muted">turn</div>
-			<div class="turnInline" style:color={turnColor}>
-				{turnText}
+			<div class="turnPills" aria-label="Turn">
+				<div class="turnPill" class:active={turnPlayer === 1}>p1</div>
+				<div class="turnPill" class:active={turnPlayer === 2}>p2</div>
 			</div>
 		</div>
+
 		<div class="kv" style:margin-top="8px">
-			<div class="muted">screenshot</div>
-			<div class="shotRight">
-				<button
-					class="iconBtn"
-					title="Copy a screenshot of the board to clipboard"
-					aria-label="Copy board screenshot"
-					onclick={copyBoardShot}
-				>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M9 4.5h6l1.2 1.6H19A2.5 2.5 0 0 1 21.5 8.6v8.8A2.5 2.5 0 0 1 19 19.9H5A2.5 2.5 0 0 1 2.5 17.4V8.6A2.5 2.5 0 0 1 5 6.1h2.8L9 4.5Zm3 3.2a4.1 4.1 0 1 0 0 8.2a4.1 4.1 0 0 0 0-8.2Zm0 2a2.1 2.1 0 1 1 0 4.2a2.1 2.1 0 0 1 0-4.2Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-				</button>
-				{#if boardShotCopyState !== "idle"}
-					<div class="shotStatus" class:ok={boardShotCopyState === "copied"}>
-						{boardShotCopyState === "copied" ? "copied" : "failed"}
-					</div>
-				{/if}
-			</div>
+			<div class="muted">moves played</div>
+			<div>[{movesPlayed}]</div>
 		</div>
-	</div>
-{/snippet}
 
-{#snippet boardSizeSection()}
-	<div class="section">
-		<div class="sectionTitle">
-			<div>board size</div>
-		</div>
-		<div class="stepper" aria-label="Board size">
-			<button
-				class="stepBtn"
-				title="Decrease board size"
-				aria-label="Decrease board size"
-				disabled={size <= minBoardSize}
-				onclick={() => applyBoardSize(size - 1)}
-			>
-				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path
-						d="M6.5 12.9h11v-1.8h-11v1.8Z"
-						fill="currentColor"
-						opacity="0.9"
-					/>
-				</svg>
-			</button>
-			<button
-				type="button"
-				class="stepValue"
-				aria-label="Current board size"
-				title="Click to edit"
-				onclick={beginEditSize}
-			>
-				{#if isSizeEditing}
-					<input
-						bind:this={sizeInput}
-						class="stepValueInput"
-						type="text"
-						inputmode="numeric"
-						autocomplete="off"
-						aria-label="Board size in stones"
-						bind:value={sizeDraft}
-						onblur={commitEditSize}
-						onkeydown={(e) => {
-							if (e.key === "Enter") {
-								e.preventDefault();
-								commitEditSize();
-							} else if (e.key === "Escape") {
-								e.preventDefault();
-								cancelEditSize();
-							}
-						}}
-					/>
-				{:else}
-					<div class="stepValueNumber">{size}</div>
-				{/if}
-				<div class="stepValueLabel">stones</div>
-			</button>
-			<button
-				class="stepBtn"
-				title="Increase board size"
-				aria-label="Increase board size"
-				disabled={size >= maxBoardSize}
-				onclick={() => applyBoardSize(size + 1)}
-			>
-				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path
-						d="M11.1 6.5v4.6H6.5v1.8h4.6v4.6h1.8v-4.6h4.6v-1.8h-4.6V6.5h-1.8Z"
-						fill="currentColor"
-						opacity="0.9"
-					/>
-				</svg>
-			</button>
-		</div>
-	</div>
-{/snippet}
-
-{#snippet multiplayerSection()}
-	{#if isWsConfigShown}
-		<div class="section">
-			<div class="sectionTitle">
-				<div>multiplayer</div>
-				<label class="sectionEnable">
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Enable multiplayer"
-						checked={isMultiplayerEnabled}
-						onchange={(e) =>
-							setMultiplayerEnabled(
-								(e.currentTarget as HTMLInputElement).checked,
-							)}
-					/>
-					<span class="muted">enable</span>
-				</label>
-			</div>
-			<div class="wsStatus" aria-label="Multiplayer connection status">
-				<div class="muted">status</div>
-				<div class="wsStatusRight">
-					<div class="wsStatusText">{wsStatus}</div>
-					<span
-						class="wsDot"
-						class:online={wsStatus === "online"}
-						class:connecting={wsStatus === "connecting"}
-					></span>
-				</div>
-			</div>
-			<div class="wsEditor" style:margin-top="8px">
-				<div class="wsEditorMain">
-					<div class="wsEditorShell">
-						<input
-							class="wsInput"
-							aria-label="WebSocket URL"
-							bind:value={wsUrlDraft}
-							placeholder="ws://localhost:8090"
-							onkeydown={onWsInputKeyDown}
-						/>
-						{#if isWsDirty}
-							<div class="wsEditorButtons">
-								<button
-									class="wsAttachBtn wsAttachLeft"
-									disabled={!wsUrlDraft.trim()}
-									onclick={connectToDraftUrl}
-								>
-									connect
-								</button>
-								<button
-									class="wsAttachBtn wsAttachRight"
-									onclick={cancelWsEdit}
-								>
-									cancel
-								</button>
-							</div>
-						{/if}
-					</div>
-				</div>
-				<button
-					class="wsSaveIconBtn"
-					title="Save WebSocket target to URL"
-					aria-label="Save WebSocket target to URL"
-					onclick={saveWsTargetToUrl}
-				>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M6 4.5h10.6L20.5 8.4V19A1.5 1.5 0 0 1 19 20.5H6A1.5 1.5 0 0 1 4.5 19V6A1.5 1.5 0 0 1 6 4.5Zm0 2V19h13V9.2l-2.8-2.7H6Zm2 1.5h6v4H8v-4Zm0 8h8v3H8v-3Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-				</button>
-			</div>
-			{#if wsUrlError}
-				<div class="wsError">{wsUrlError}</div>
-			{/if}
-		</div>
-	{/if}
-{/snippet}
-
-{#snippet turnTimerSection()}
-	<div class="section">
-		<div class="sectionTitle">
-			<div>turn timer</div>
+		<div class="kv" style:margin-top="10px">
+			<div class="muted">turn timer</div>
 			<label class="sectionEnable">
 				<input
 					class="check"
@@ -496,7 +290,34 @@
 				<span class="muted">enable</span>
 			</label>
 		</div>
-		<div class="timerTop">
+
+		<div class="timerRow" style:margin-top="8px">
+			<div class="timerGrid" aria-label="Turn timer">
+				<div class="timerHalf" class:active={clockActivePlayer === 1}>
+					<div class="timerPlayer muted">p1</div>
+					<div class="timerValue" class:overtime={clockRemainingMsP1 < 0}>
+						{formatMs(clockRemainingMsP1)}
+					</div>
+				</div>
+				<div class="timerHalf" class:active={clockActivePlayer === 2}>
+					<div class="timerPlayer muted">p2</div>
+					<div class="timerValue" class:overtime={clockRemainingMsP2 < 0}>
+						{formatMs(clockRemainingMsP2)}
+					</div>
+				</div>
+			</div>
+			<button
+				class="iconBtn"
+				disabled={!clockEnabled}
+				title={clockPaused ? "Resume turn timer" : "Pause turn timer"}
+				aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
+				onclick={toggleClockPaused}
+			>
+				pause
+			</button>
+		</div>
+
+		<div class="timerRow" style:margin-top="6px">
 			<div class="timerParams">
 				<label class="timerParam">
 					<span class="muted">total</span>
@@ -532,100 +353,116 @@
 				aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
 				onclick={toggleClockPaused}
 			>
-				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-					{#if clockPaused}
-						<path
-							d="M9 7.2v9.6L17.4 12 9 7.2Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					{:else}
-						<path
-							d="M7.5 6.5h3v11h-3v-11Zm6 0h3v11h-3v-11Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					{/if}
-				</svg>
+				pause
 			</button>
 		</div>
-		<div class="timerGrid" aria-label="Turn timer">
-			<div class="timerHalf" class:active={clockActivePlayer === 1}>
-				<div class="timerPlayer muted">p1</div>
-				<div class="timerValue" class:overtime={clockRemainingMsP1 < 0}>
-					{formatMs(clockRemainingMsP1)}
-				</div>
-			</div>
-			<div class="timerHalf" class:active={clockActivePlayer === 2}>
-				<div class="timerPlayer muted">p2</div>
-				<div class="timerValue" class:overtime={clockRemainingMsP2 < 0}>
-					{formatMs(clockRemainingMsP2)}
-				</div>
-			</div>
-		</div>
+
 		{#if !clockEnabled}
 			<div class="timerNote muted">disabled</div>
 		{:else if !clockStarted}
 			<div class="timerNote muted">starts after p1’s first move</div>
 		{/if}
-	</div>
-{/snippet}
 
-{#snippet gameActionsSection()}
-	<div class="section">
-		<div class="sectionTitle">
-			<div>game actions</div>
-		</div>
-		<div class="buttons">
-			<button class="btn" disabled={isUndoDisabled} onclick={undo}>
-				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path
-						d="M9 7H5v4l1.6-1.6A7 7 0 1 1 5 12h2a5 5 0 1 0 1.5-3.5L9 7Z"
-						fill="currentColor"
-						opacity="0.9"
-					/>
-				</svg>
-				undo
-			</button>
+		<div class="buttons" style:margin-top="10px">
+			<button class="btn" disabled={isUndoDisabled} onclick={undo}>undo</button>
 			{#if isSwapShown}
-				<button class="btn" disabled={isSwapDisabled} onclick={swap}>
-					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path
-							d="M7 7h10l-2-2 1.4-1.4L21 8l-4.6 4.4L15 11l2-2H7V7Zm10 10H7l2 2-1.4 1.4L3 16l4.6-4.4L9 13l-2 2h10v2Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					</svg>
-					switch
-				</button>
+				<button class="btn" disabled={isSwapDisabled} onclick={swap}
+					>swap</button
+				>
 			{/if}
 			<button
 				class="btn btnDanger"
 				title="Reset to a new game"
 				onclick={newGame}
 			>
-				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path
-						d="M7 6h10l-1 14H8L7 6Zm2-2h6l1 2H8l1-2Z"
-						fill="currentColor"
-						opacity="0.9"
-					/>
-				</svg>
 				new game
 			</button>
 		</div>
 	</div>
 {/snippet}
 
-{#snippet modesSection()}
+{#snippet multiplayerSection()}
 	<div class="section">
 		<div class="sectionTitle">
-			<div>modes</div>
+			<div>multiplayer</div>
+			<label class="sectionEnable">
+				<input
+					class="check"
+					type="checkbox"
+					aria-label="Enable multiplayer"
+					checked={isMultiplayerEnabled}
+					onchange={(e) =>
+						setMultiplayerEnabled(
+							(e.currentTarget as HTMLInputElement).checked,
+						)}
+				/>
+				<span class="muted">enable</span>
+			</label>
 		</div>
-		<div class="shortcutList" aria-label="Modes">
+		<div class="wsEditor">
+			<div class="wsEditorMain">
+				<div class="wsEditorShell">
+					<input
+						class="wsInput"
+						aria-label="Target URL"
+						bind:value={wsUrlDraft}
+						placeholder="ws://localhost:8090"
+						onkeydown={onWsInputKeyDown}
+						disabled={!isWsConfigShown}
+					/>
+				</div>
+			</div>
+			<button
+				class="wsSaveIconBtn"
+				title="Save WebSocket target to URL"
+				aria-label="Save WebSocket target to URL"
+				onclick={saveWsTargetToUrl}
+				disabled={!isWsConfigShown}
+			>
+				save
+			</button>
+		</div>
+		<div class="kv" style:margin-top="8px">
+			<div class="muted">status</div>
+			<div class="wsStatusText">{wsStatus}</div>
+		</div>
+		{#if wsUrlError}
+			<div class="wsError">{wsUrlError}</div>
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet keybindingsSection()}
+	<div class="section">
+		<div class="sectionTitle">
+			<div>keybindings</div>
+		</div>
+		<div class="shortcutList">
+			<div class="keycap">scroll</div>
+			<div class="keyRow">
+				<div>zoom</div>
+				<div class="keyRowRight">
+					<div class="muted">[{Math.round(zoomX * 100) / 100}×]</div>
+					<button
+						class="iconBtn"
+						title={isZoomAtOneX ? "Already at 1×" : "Reset view"}
+						aria-label="Reset view"
+						disabled={isZoomAtOneX}
+						onclick={resetView}
+					>
+						reset
+					</button>
+				</div>
+			</div>
+
+			<div class="keycap">right-drag</div>
+			<div>pan</div>
+
 			<div class="keycap">e</div>
-			<div class="modeCell">
-				<div>show extra info</div>
+			<div class="modeRow">
+				<div>
+					show extra info <span class="muted">*(mode)*</span>
+				</div>
 				<input
 					class="check"
 					type="checkbox"
@@ -637,10 +474,9 @@
 			</div>
 
 			<div class="keycap">r</div>
-			<div class="modeCell">
-				<div class="modeCellLeft">
-					<div>stone rotation mode</div>
-					<div class="modeHint">hold ctrl for finer rotation</div>
+			<div class="modeRow">
+				<div>
+					rotate stone <span class="muted">*(mode)*</span>
 				</div>
 				<input
 					class="check"
@@ -652,22 +488,14 @@
 				/>
 			</div>
 
-			<div class="keycap">b</div>
-			<div class="modeCell">
-				<div>show component borders</div>
-				<input
-					class="check"
-					type="checkbox"
-					aria-label="Toggle component borders"
-					checked={bordersShown}
-					onchange={(e) =>
-						setBordersShown((e.currentTarget as HTMLInputElement).checked)}
-				/>
-			</div>
+			<div class="keycap"></div>
+			<div class="muted">hold ctrl for finer rotation</div>
 
 			<div class="keycap">f</div>
-			<div class="modeCell">
-				<div>preview future moves</div>
+			<div class="modeRow">
+				<div>
+					preview future moves <span class="muted">*(mode)*</span>
+				</div>
 				<input
 					class="check"
 					type="checkbox"
@@ -678,25 +506,50 @@
 						setFutureEnabled((e.currentTarget as HTMLInputElement).checked)}
 				/>
 			</div>
+
+			<div class="keycap">b</div>
+			<div class="modeRow">
+				<div>
+					show component borders <span class="muted">*(mode)*</span>
+				</div>
+				<input
+					class="check"
+					type="checkbox"
+					aria-label="Toggle component borders"
+					checked={bordersShown}
+					onchange={(e) =>
+						setBordersShown((e.currentTarget as HTMLInputElement).checked)}
+				/>
+			</div>
+
+			<div class="keycap"></div>
+			<div class="muted">modes: hold key or use shift+key to toggle</div>
 		</div>
-		<div class="modeNote">hold the key, or use shift+key to toggle</div>
 	</div>
 {/snippet}
 
-{#snippet keybindingsSection()}
+{#snippet screenshotSection()}
 	<div class="section">
 		<div class="sectionTitle">
-			<div>keybindings</div>
+			<div>screenshot</div>
 		</div>
-		<div class="shortcutList">
-			<div class="keycap">scroll</div>
-			<div>zoom</div>
-			<div class="keycap">right-drag</div>
-			<div>pan</div>
-			{#if isMultiplayerEnabled}
-				<div class="keycap">f mode + ctrl</div>
-				<div>shared preview (send/receive)</div>
-			{/if}
+		<div class="kv">
+			<div class="muted">screenshot</div>
+			<div class="shotRight">
+				<button
+					class="iconBtn"
+					title="Copy a screenshot of the board to clipboard"
+					aria-label="Copy board screenshot"
+					onclick={copyBoardShot}
+				>
+					copy
+				</button>
+				{#if boardShotCopyState !== "idle"}
+					<div class="shotStatus" class:ok={boardShotCopyState === "copied"}>
+						{boardShotCopyState === "copied" ? "copied" : "failed"}
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 {/snippet}
@@ -757,14 +610,11 @@
 
 <div class="toolbar">
 	<div class="sections">
-		{@render topSection()}
-		{@render boardSizeSection()}
+		{@render gameStateSection()}
 		{@render multiplayerSection()}
-		{@render turnTimerSection()}
-		{@render gameActionsSection()}
-		{@render modesSection()}
 		{@render keybindingsSection()}
 		{@render playerColorsSection()}
+		{@render screenshotSection()}
 	</div>
 </div>
 
@@ -826,6 +676,67 @@
 		gap: 10px;
 	}
 
+	.boardSizeRight {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.boardSizeValue {
+		font-weight: 650;
+		letter-spacing: 0.2px;
+	}
+
+	.turnPills {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.turnPill {
+		padding: 3px 8px;
+		border-radius: 999px;
+		border: 1px solid rgba(0, 0, 0, 0.14);
+		background: rgba(255, 255, 255, 0.6);
+		color: rgba(0, 0, 0, 0.62);
+		font-weight: 650;
+		font-size: 12px;
+		line-height: 1.1;
+	}
+
+	.turnPill.active {
+		border-color: rgba(0, 0, 0, 0.22);
+		background: rgba(0, 0, 0, 0.08);
+		color: rgba(0, 0, 0, 0.86);
+	}
+
+	.timerRow {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 8px;
+	}
+
+	.keyRow {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+	}
+
+	.keyRowRight {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.modeRow {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
+	}
+
 	.wsEditor {
 		display: flex;
 		align-items: flex-start;
@@ -871,10 +782,10 @@
 		border-radius: 12px;
 		background: rgba(255, 255, 255, 0.7);
 		color: rgba(0, 0, 0, 0.78);
-		width: var(--control-h);
+		min-width: 52px;
 		height: var(--control-h);
 		box-sizing: border-box;
-		padding: 0;
+		padding: 0 10px;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -895,81 +806,6 @@
 		transform: translateY(0px);
 	}
 
-	.wsEditorButtons {
-		border-top: 1px solid rgba(0, 0, 0, 0.1);
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-	}
-
-	.wsAttachBtn {
-		height: var(--control-h);
-		box-sizing: border-box;
-		border: none;
-		background: transparent;
-		color: rgba(0, 0, 0, 0.86);
-		font-weight: 650;
-		padding: 0.5em 1em;
-		cursor: pointer;
-		transition:
-			background 120ms ease,
-			opacity 120ms ease;
-	}
-
-	.wsAttachBtn:hover {
-		background: rgba(0, 0, 0, 0.04);
-	}
-
-	.wsAttachBtn:active {
-		background: rgba(0, 0, 0, 0.06);
-	}
-
-	.wsAttachBtn:disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
-	}
-
-	.wsAttachLeft {
-		border-right: 1px solid rgba(0, 0, 0, 0.08);
-	}
-
-	.wsAttachRight {
-		color: rgba(0, 0, 0, 0.75);
-	}
-
-	.wsStatus {
-		margin-top: 8px;
-		display: grid;
-		grid-template-columns: 1fr auto;
-		gap: 8px;
-		align-items: center;
-	}
-
-	.wsStatusRight {
-		display: inline-flex;
-		align-items: center;
-		justify-content: flex-end;
-		gap: 6px;
-		min-width: 0;
-	}
-
-	.wsDot {
-		width: 9px;
-		height: 9px;
-		border-radius: 999px;
-		background: rgba(0, 0, 0, 0.22);
-		border: 1px solid rgba(0, 0, 0, 0.12);
-	}
-
-	.wsDot.online {
-		background: rgba(40, 150, 80, 0.95);
-		border-color: rgba(20, 90, 50, 0.35);
-	}
-
-	.wsDot.connecting {
-		background: rgba(215, 145, 45, 0.95);
-		border-color: rgba(145, 90, 20, 0.35);
-	}
-
 	.wsStatusText {
 		text-transform: lowercase;
 	}
@@ -978,12 +814,6 @@
 		margin-top: 8px;
 		font-size: 12px;
 		color: rgba(180, 20, 40, 0.92);
-	}
-
-	.zoomValue {
-		display: inline-flex;
-		align-items: center;
-		gap: 8px;
 	}
 
 	.shotRight {
@@ -1050,96 +880,6 @@
 		transform: none;
 	}
 
-	.stepper {
-		display: grid;
-		grid-template-columns: 32px 1fr 32px;
-		gap: 8px;
-		align-items: center;
-	}
-
-	.stepBtn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: var(--control-h);
-		height: var(--control-h);
-		box-sizing: border-box;
-		border-radius: 11px;
-		border: 1px solid rgba(0, 0, 0, 0.12);
-		background: rgba(255, 255, 255, 0.92);
-		color: rgba(0, 0, 0, 0.84);
-		cursor: pointer;
-		transition:
-			transform 80ms ease,
-			border-color 120ms ease,
-			opacity 120ms ease;
-	}
-
-	.stepBtn:hover {
-		transform: translateY(-1px);
-		border-color: rgba(0, 0, 0, 0.18);
-	}
-
-	.stepBtn:active {
-		transform: translateY(0px);
-	}
-
-	.stepBtn:disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
-		transform: none;
-	}
-
-	.stepValue {
-		height: var(--control-h);
-		box-sizing: border-box;
-		display: flex;
-		align-items: baseline;
-		justify-content: center;
-		gap: 8px;
-		padding: 6px 8px;
-		border-radius: 12px;
-		border: 1px solid rgba(0, 0, 0, 0.08);
-		background: rgba(255, 255, 255, 0.75);
-		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-		cursor: pointer;
-		user-select: none;
-	}
-
-	.stepValue:hover {
-		border-color: rgba(0, 0, 0, 0.14);
-	}
-
-	.stepValueInput {
-		width: 5ch;
-		height: calc(var(--control-h) - 8px);
-		box-sizing: border-box;
-		padding: 0.2em 0.5em;
-		border-radius: 10px;
-		border: 1px solid rgba(0, 0, 0, 0.16);
-		background: rgba(255, 255, 255, 0.9);
-		color: rgba(0, 0, 0, 0.86);
-		outline: none;
-		text-align: center;
-		font: inherit;
-		font-weight: 750;
-	}
-
-	.stepValueInput:focus {
-		border-color: rgba(0, 0, 0, 0.22);
-	}
-
-	.stepValueNumber {
-		font-size: 16px;
-		font-weight: 750;
-		letter-spacing: 0.2px;
-	}
-
-	.stepValueLabel {
-		font-size: 12px;
-		opacity: 0.7;
-	}
-
 	.colorRow {
 		margin-top: 4px;
 		display: flex;
@@ -1185,45 +925,6 @@
 		display: grid;
 		grid-template-columns: 1fr;
 		gap: 6px;
-	}
-
-	.turnInline {
-		font-weight: 750;
-		letter-spacing: 0.2px;
-	}
-
-	.modeCell {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 10px;
-	}
-
-	.modeCellLeft {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-
-	.modeHint {
-		font-size: 11px;
-		line-height: 1.2;
-		color: rgba(0, 0, 0, 0.64);
-	}
-
-	.modeNote {
-		margin-top: 8px;
-		color: rgba(0, 0, 0, 0.68);
-		font-size: 12px;
-		line-height: 1.2;
-	}
-
-	.timerTop {
-		display: flex;
-		align-items: flex-end;
-		justify-content: space-between;
-		gap: 10px;
-		margin-bottom: 8px;
 	}
 
 	.sectionEnable {
