@@ -502,7 +502,7 @@
 			<div>pan</div>
 
 			<div class="keycap">e</div>
-			<div class="modeRow">
+			<label class="modeRow modeLabel">
 				<div>
 					show extra info <span class="muted">*(mode)*</span>
 				</div>
@@ -514,10 +514,10 @@
 					onchange={(e) =>
 						setExtraInfoEnabled((e.currentTarget as HTMLInputElement).checked)}
 				/>
-			</div>
+			</label>
 
 			<div class="keycap">r</div>
-			<div class="modeRow">
+			<label class="modeRow modeLabel">
 				<div>
 					rotate stone <span class="muted">*(mode)*</span>
 				</div>
@@ -529,13 +529,13 @@
 					onchange={(e) =>
 						setRotationEnabled((e.currentTarget as HTMLInputElement).checked)}
 				/>
-			</div>
+			</label>
 
 			<div class="keycap"></div>
 			<div class="muted">hold ctrl for finer rotation</div>
 
 			<div class="keycap">f</div>
-			<div class="modeRow">
+			<label class="modeRow modeLabel">
 				<div>
 					preview future moves <span class="muted">*(mode)*</span>
 				</div>
@@ -548,10 +548,10 @@
 					onchange={(e) =>
 						setFutureEnabled((e.currentTarget as HTMLInputElement).checked)}
 				/>
-			</div>
+			</label>
 
 			<div class="keycap">b</div>
-			<div class="modeRow">
+			<label class="modeRow modeLabel">
 				<div>
 					show component borders <span class="muted">*(mode)*</span>
 				</div>
@@ -563,7 +563,7 @@
 					onchange={(e) =>
 						setBordersShown((e.currentTarget as HTMLInputElement).checked)}
 				/>
-			</div>
+			</label>
 
 			<div class="keycap"></div>
 			<div class="muted">modes: hold key or use shift+key to toggle</div>
@@ -789,6 +789,11 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 10px;
+	}
+
+	.modeLabel {
+		cursor: pointer;
+		user-select: none;
 	}
 
 	.wsEditor {
