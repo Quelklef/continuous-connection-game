@@ -3013,7 +3013,7 @@
 									x2="0.18"
 									y2="0.18"
 									stroke={latestIndexTextStyle.fill}
-									stroke-opacity="1"
+									stroke-opacity="0.8"
 									stroke-width="2"
 									vector-effect="non-scaling-stroke"
 								/>
@@ -3023,7 +3023,7 @@
 									x2="0.18"
 									y2="0"
 									stroke={latestIndexTextStyle.fill}
-									stroke-opacity="1"
+									stroke-opacity="0.8"
 									stroke-width="2"
 									vector-effect="non-scaling-stroke"
 								/>
