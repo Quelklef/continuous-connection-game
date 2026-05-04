@@ -2578,6 +2578,40 @@
 		if (e.button === 0) {
 			if (mouseOverHistory) return;
 
+			if (isPreviewEnabled) {
+				if (isSharedPreviewEditEnabled && connected) {
+					if (playerMode === 1) return;
+					const ws = playerMode.socket;
+					const op: SharedPreviewOp = {
+						kind: "add",
+						parentKey: activeKey,
+						move: {
+							kind: "stone",
+							stone: { coords: mouseLoc, theta: placementTheta },
+						},
+					};
+					const { key: nextKey, changed } = overlayUpsertAdd(
+						sharedOverlay,
+						op.parentKey,
+						op.move,
+					);
+					if (changed) {
+						sharedOverlayVersion += 1;
+						setActiveKey(nextKey);
+						send(ws, { type: "shared preview", data: op });
+					}
+				} else {
+					const fromId = baselineIdByKey[activeKey] ?? realCursorId;
+					const nextId = advanceFrom(fromId, {
+						coords: mouseLoc,
+						theta: placementTheta,
+					});
+					hasStagedBaselineChanges = true;
+					setActiveKey(baselineKeyById[nextId] ?? activeKey);
+				}
+				return;
+			}
+
 			if (playerMode === 1) {
 				const atMs = Date.now();
 				const prevMoveCount = realMoveCount;
@@ -2601,38 +2635,6 @@
 				} else {
 					const nextTurn = playerFromIndex(prevMoveCount + 1);
 					applyClockTurnTransition(prevTurn, nextTurn, atMs);
-				}
-				return;
-			}
-
-			if (isPreviewEnabled) {
-				if (isSharedPreviewEditEnabled && connected) {
-					const op: SharedPreviewOp = {
-						kind: "add",
-						parentKey: activeKey,
-						move: {
-							kind: "stone",
-							stone: { coords: mouseLoc, theta: placementTheta },
-						},
-					};
-					const { key: nextKey, changed } = overlayUpsertAdd(
-						sharedOverlay,
-						op.parentKey,
-						op.move,
-					);
-					if (changed) {
-						sharedOverlayVersion += 1;
-						setActiveKey(nextKey);
-						send(playerMode.socket, { type: "shared preview", data: op });
-					}
-				} else {
-					const fromId = baselineIdByKey[activeKey] ?? realCursorId;
-					const nextId = advanceFrom(fromId, {
-						coords: mouseLoc,
-						theta: placementTheta,
-					});
-					hasStagedBaselineChanges = true;
-					setActiveKey(baselineKeyById[nextId] ?? activeKey);
 				}
 				return;
 			}
@@ -3184,13 +3186,13 @@
 					: realMoveCount === 0) ||
 					(playerMode !== 1 && !isPreviewEnabled && !connected)}
 				undo={() => {
-					if (playerMode === 1) {
-						undoReal();
+					if (isPreviewEnabled) {
+						undoActive();
 						return;
 					}
 
-					if (isPreviewEnabled) {
-						undoActive();
+					if (playerMode === 1) {
+						undoReal();
 						return;
 					}
 
@@ -3201,16 +3203,51 @@
 				}}
 				{newGame}
 				isSwapShown={true}
-				isSwapDisabled={playerMode === 1
-					? realMoveCount !== 1 || nodeAt(realCursorId).playersSwapped
-					: !connected ||
+				isSwapDisabled={(() => {
+					if (isPreviewEnabled) {
+						const fromId = baselineIdByKey[activeKey] ?? realCursorId;
+						const n = nodeAt(fromId);
+						return n.stonePly !== 1 || n.playersSwapped;
+					}
+					if (playerMode === 1)
+						return realMoveCount !== 1 || nodeAt(realCursorId).playersSwapped;
+					return (
+						!connected ||
 						realMoveCount !== 1 ||
 						!myTurn ||
-						nodeAt(realCursorId).playersSwapped ||
-						isPreviewEnabled}
+						nodeAt(realCursorId).playersSwapped
+					);
+				})()}
 				swap={() => {
+					if (isPreviewEnabled) {
+						if (playerMode !== 1 && isSharedPreviewEditEnabled && connected) {
+							const ws = playerMode.socket;
+							const op: SharedPreviewOp = {
+								kind: "add",
+								parentKey: activeKey,
+								move: { kind: "swap" },
+							};
+							const { key: nextKey, changed } = overlayUpsertAdd(
+								sharedOverlay,
+								op.parentKey,
+								op.move,
+							);
+							if (changed) {
+								sharedOverlayVersion += 1;
+								setActiveKey(nextKey);
+								send(ws, { type: "shared preview", data: op });
+							}
+						} else {
+							const fromId = baselineIdByKey[activeKey] ?? realCursorId;
+							const nextId = advanceSwapFrom(fromId);
+							hasStagedBaselineChanges = true;
+							setActiveKey(baselineKeyById[nextId] ?? activeKey);
+						}
+						return;
+					}
+
 					swapReal();
-					if (playerMode !== 1 && connected && !isPreviewEnabled)
+					if (playerMode !== 1 && connected)
 						send(playerMode.socket, { type: "swap" });
 				}}
 			/>
