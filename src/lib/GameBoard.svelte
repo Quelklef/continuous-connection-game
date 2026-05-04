@@ -2993,15 +2993,33 @@
 
 				{#if isExtraInfoEnabled && displayMoveCount > 0 && svgPixels && svgPixels.w > 0}
 					{@const latestStone = displayMoves[displayMoveCount - 1]}
-					{@const unitsPerPx = viewBox.w / svgPixels.w}
-					{@const t = unitsPerPx * 2}
 					{#if latestStone}
 						{@const cx = latestStone.coords[0]}
 						{@const cy = latestStone.coords[1]}
 						{@const thetaDeg = (latestStone.theta * 180) / Math.PI}
+						<defs>
+							<pattern
+								id="latestMoveHatch"
+								patternUnits="userSpaceOnUse"
+								width="0.16"
+								height="0.16"
+								patternTransform="rotate(45)"
+							>
+								<line
+									x1="0"
+									y1="0"
+									x2="0"
+									y2="0.16"
+									stroke="black"
+									stroke-opacity="0.35"
+									stroke-width="0.035"
+								/>
+							</pattern>
+						</defs>
 						<path
-							d={`M ${cx - 1 / 2 - t} ${cy - 1 / 2 - t} h ${1 + 2 * t} v ${1 + 2 * t} h ${-(1 + 2 * t)} Z M ${cx - 1 / 2} ${cy - 1 / 2} h 1 v 1 h -1 Z`}
-							fill="rgba(0,0,0,0.95)"
+							d={`M ${cx - 1 / 2} ${cy - 1 / 2} h 1 v 1 h -1 Z M ${cx - 0.22} ${cy - 0.22} h 0.44 v 0.44 h -0.44 Z`}
+							fill="url(#latestMoveHatch)"
+							fill-opacity="0.6"
 							fill-rule="evenodd"
 							style:pointer-events="none"
 							transform={`rotate(${thetaDeg} ${cx} ${cy})`}
