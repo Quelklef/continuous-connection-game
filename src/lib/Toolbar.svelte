@@ -542,55 +542,6 @@
 			<div class="sectionTitle">
 				<div>actions</div>
 			</div>
-			<div class="modeToggles" aria-label="Mode toggles">
-				<label class="modeToggle">
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Toggle extra info"
-						checked={extraInfoEnabled}
-						onchange={(e) =>
-							setExtraInfoEnabled(
-								(e.currentTarget as HTMLInputElement).checked,
-							)}
-					/>
-					<span class="muted">extra</span>
-				</label>
-				<label class="modeToggle">
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Toggle rotation mode"
-						checked={rotationEnabled}
-						onchange={(e) =>
-							setRotationEnabled((e.currentTarget as HTMLInputElement).checked)}
-					/>
-					<span class="muted">rotate</span>
-				</label>
-				<label class="modeToggle">
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Toggle component borders"
-						checked={bordersShown}
-						onchange={(e) =>
-							setBordersShown((e.currentTarget as HTMLInputElement).checked)}
-					/>
-					<span class="muted">borders</span>
-				</label>
-				<label class="modeToggle">
-					<input
-						class="check"
-						type="checkbox"
-						aria-label="Toggle future mode"
-						checked={futureEnabled}
-						disabled={isFutureToggleDisabled}
-						onchange={(e) =>
-							setFutureEnabled((e.currentTarget as HTMLInputElement).checked)}
-					/>
-					<span class="muted">future</span>
-				</label>
-			</div>
 			<div class="buttons">
 				<button class="btn" disabled={isUndoDisabled} onclick={undo}>
 					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -629,6 +580,69 @@
 					new game
 				</button>
 			</div>
+		</div>
+
+		<div class="section">
+			<div class="sectionTitle">
+				<div>modes</div>
+			</div>
+			<div class="shortcutList" aria-label="Modes">
+				<div class="keycap">e</div>
+				<div class="modeCell">
+					<div>extra mode</div>
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Toggle extra mode"
+						checked={extraInfoEnabled}
+						onchange={(e) =>
+							setExtraInfoEnabled(
+								(e.currentTarget as HTMLInputElement).checked,
+							)}
+					/>
+				</div>
+
+				<div class="keycap">r</div>
+				<div class="modeCell">
+					<div>rotate mode</div>
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Toggle rotate mode"
+						checked={rotationEnabled}
+						onchange={(e) =>
+							setRotationEnabled((e.currentTarget as HTMLInputElement).checked)}
+					/>
+				</div>
+
+				<div class="keycap">b</div>
+				<div class="modeCell">
+					<div>borders mode</div>
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Toggle borders mode"
+						checked={bordersShown}
+						onchange={(e) =>
+							setBordersShown((e.currentTarget as HTMLInputElement).checked)}
+					/>
+				</div>
+
+				<div class="keycap">f</div>
+				<div class="modeCell">
+					<div>future mode</div>
+					<input
+						class="check"
+						type="checkbox"
+						aria-label="Toggle future mode"
+						checked={futureEnabled}
+						disabled={isFutureToggleDisabled}
+						onchange={(e) =>
+							setFutureEnabled((e.currentTarget as HTMLInputElement).checked)}
+					/>
+				</div>
+			</div>
+			<div class="modeNote">hold the key, or use shift+key to toggle</div>
 		</div>
 
 		{#if isWsConfigShown}
@@ -719,20 +733,12 @@
 				<div>zoom</div>
 				<div class="keycap">right-drag</div>
 				<div>pan</div>
-				<div class="keycap">e</div>
-				<div>extra info</div>
-				<div class="keycap">r + scroll</div>
+				<div class="keycap">r mode + scroll</div>
 				<div>rotate stone</div>
-				<div class="keycap">r + ctrl + scroll</div>
+				<div class="keycap">r mode + ctrl + scroll</div>
 				<div>rotate stone (fine)</div>
-				<div class="keycap">b</div>
-				<div>component borders</div>
-				<div class="keycap">shift + (e/r/b/f)</div>
-				<div>toggle mode</div>
 				{#if isMultiplayerEnabled}
-					<div class="keycap">f</div>
-					<div>future mode</div>
-					<div class="keycap">f + ctrl</div>
+					<div class="keycap">f mode + ctrl</div>
 					<div>shared preview (send/receive)</div>
 				{/if}
 			</div>
@@ -1164,18 +1170,18 @@
 		letter-spacing: 0.2px;
 	}
 
-	.modeToggles {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 6px 10px;
-		margin-bottom: 8px;
+	.modeCell {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px;
 	}
 
-	.modeToggle {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		user-select: none;
+	.modeNote {
+		margin-top: 8px;
+		color: rgba(0, 0, 0, 0.68);
+		font-size: 12px;
+		line-height: 1.2;
 	}
 
 	.timerTop {
