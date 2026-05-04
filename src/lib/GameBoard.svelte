@@ -186,6 +186,81 @@
 		return [rot(-h, -h), rot(h, -h), rot(h, h), rot(-h, h)];
 	};
 
+	const cornersAt = (theta: number, halfSize: number): [number, number][] => {
+		const c = Math.cos(theta);
+		const s = Math.sin(theta);
+		const rot = (x: number, y: number): [number, number] => [
+			x * c - y * s,
+			x * s + y * c,
+		];
+		return [
+			rot(-halfSize, -halfSize),
+			rot(halfSize, -halfSize),
+			rot(halfSize, halfSize),
+			rot(-halfSize, halfSize),
+		];
+	};
+
+	const cross = (
+		o: [number, number],
+		a: [number, number],
+		b: [number, number],
+	): number => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+
+	const convexHull = (pts: [number, number][]): [number, number][] => {
+		const points = pts
+			.slice()
+			.toSorted((p, q) => (p[0] === q[0] ? p[1] - q[1] : p[0] - q[0]));
+		if (points.length <= 1) return points;
+
+		const lower: [number, number][] = [];
+		for (const p of points) {
+			while (
+				lower.length >= 2 &&
+				cross(lower[lower.length - 2]!, lower[lower.length - 1]!, p) <= 0
+			)
+				lower.pop();
+			lower.push(p);
+		}
+
+		const upper: [number, number][] = [];
+		for (let i = points.length - 1; i >= 0; i--) {
+			const p = points[i]!;
+			while (
+				upper.length >= 2 &&
+				cross(upper[upper.length - 2]!, upper[upper.length - 1]!, p) <= 0
+			)
+				upper.pop();
+			upper.push(p);
+		}
+
+		upper.pop();
+		lower.pop();
+		return lower.concat(upper);
+	};
+
+	const shadowHullForStone = (
+		stone: StoneData,
+		theta: number,
+	): [number, number][] => {
+		const rPts = stoneCorners(stone);
+		const pPts = cornersAt(theta, 1); // 2P: side length 2 (half-size 1)
+		const sums: [number, number][] = [];
+		for (const a of rPts) {
+			for (const b of pPts) sums.push([a[0] + b[0], a[1] + b[1]]);
+		}
+		return convexHull(sums);
+	};
+
+	const pathFromHull = (hull: [number, number][]): string => {
+		if (hull.length < 3) return "";
+		let d = `M ${hull[0]![0]} ${hull[0]![1]}`;
+		for (let i = 1; i < hull.length; i++)
+			d += ` L ${hull[i]![0]} ${hull[i]![1]}`;
+		d += " Z";
+		return d;
+	};
+
 	const stoneAabb = (stone: StoneData): Aabb => {
 		const pts = stoneCorners(stone);
 		let x0 = pts[0]?.[0] ?? 0;
@@ -2782,14 +2857,16 @@
 
 				{#if isShiftHeld}
 					{#each movesForRender as move (move.i)}
-						<rect
-							x={move.stone.coords[0] - 3 / 2}
-							y={move.stone.coords[1] - 3 / 2}
-							width="3"
-							height="3"
-							fill={playerColor(playerFromIndex(move.i))}
-							fill-opacity="0.16"
-						></rect>
+						{@const d = pathFromHull(
+							shadowHullForStone(move.stone, placementTheta),
+						)}
+						{#if d}
+							<path
+								{d}
+								fill={playerColor(playerFromIndex(move.i))}
+								fill-opacity="0.16"
+							></path>
+						{/if}
 					{/each}
 				{/if}
 
