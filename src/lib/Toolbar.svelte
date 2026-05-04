@@ -452,9 +452,16 @@
 				save
 			</button>
 		</div>
-		<div class="kv" style:margin-top="8px">
+		<div class="wsStatus" aria-label="Multiplayer connection status">
 			<div class="muted">status</div>
-			<div class="wsStatusText">{wsStatus}</div>
+			<div class="wsStatusRight">
+				<div class="wsStatusText">{wsStatus}</div>
+				<span
+					class="wsDot"
+					class:online={wsStatus === "online"}
+					class:connecting={wsStatus === "connecting"}
+				></span>
+			</div>
 		</div>
 		{#if wsUrlError}
 			<div class="wsError">{wsUrlError}</div>
@@ -849,6 +856,40 @@
 
 	.wsStatusText {
 		text-transform: lowercase;
+	}
+
+	.wsStatus {
+		margin-top: 8px;
+		display: grid;
+		grid-template-columns: 1fr auto;
+		gap: 8px;
+		align-items: center;
+	}
+
+	.wsStatusRight {
+		display: inline-flex;
+		align-items: center;
+		justify-content: flex-end;
+		gap: 6px;
+		min-width: 0;
+	}
+
+	.wsDot {
+		width: 9px;
+		height: 9px;
+		border-radius: 999px;
+		background: rgba(0, 0, 0, 0.22);
+		border: 1px solid rgba(0, 0, 0, 0.12);
+	}
+
+	.wsDot.online {
+		background: rgba(40, 150, 80, 0.95);
+		border-color: rgba(20, 90, 50, 0.35);
+	}
+
+	.wsDot.connecting {
+		background: rgba(215, 145, 45, 0.95);
+		border-color: rgba(145, 90, 20, 0.35);
 	}
 
 	.wsError {
