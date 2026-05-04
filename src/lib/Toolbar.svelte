@@ -1010,7 +1010,9 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 8px;
-		padding: 4px 6px;
+		height: var(--control-h);
+		box-sizing: border-box;
+		padding: 0 6px;
 		border-radius: 12px;
 		border: 1px solid rgba(0, 0, 0, 0.08);
 		background: rgba(255, 255, 255, 0.75);
