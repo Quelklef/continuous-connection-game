@@ -313,7 +313,21 @@
 				aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
 				onclick={toggleClockPaused}
 			>
-				pause
+				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+					{#if clockPaused}
+						<path
+							d="M9 7.2v9.6L17.4 12 9 7.2Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					{:else}
+						<path
+							d="M7.5 6.5h3v11h-3v-11Zm6 0h3v11h-3v-11Z"
+							fill="currentColor"
+							opacity="0.9"
+						/>
+					{/if}
+				</svg>
 			</button>
 		</div>
 
