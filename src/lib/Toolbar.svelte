@@ -719,11 +719,11 @@
 	.boardSizeRight {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
+		gap: 9px;
 	}
 
 	.boardSizeValue {
-		font-weight: 650;
+		font-weight: 500;
 		letter-spacing: 0.2px;
 	}
 
