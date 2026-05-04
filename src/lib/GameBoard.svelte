@@ -502,7 +502,7 @@
 
 	const setRealCursor = (next: NodeId): void => {
 		realCursorId = next;
-		if (playerMode === 1 || !isPreviewMode) {
+		if (!isPreviewMode) {
 			activeKey = baselineKeyById[next] ?? rootKey;
 			hoverKey = null;
 		}
@@ -514,7 +514,7 @@
 	};
 
 	const realMoveCount = $derived(nodeAt(realCursorId).stonePly);
-	const isPreviewEnabled = $derived(playerMode !== 1 && isPreviewMode);
+	const isPreviewEnabled = $derived(isPreviewMode);
 	const isHistoryClickEnabled = $derived(playerMode === 1 || isPreviewEnabled);
 	const isSharedPreviewEditEnabled = $derived(
 		isPreviewEnabled && isCtrlHeld && playerMode !== 1 && connected,
@@ -642,13 +642,11 @@
 	});
 
 	const setPreviewMode = (next: boolean): void => {
-		if (playerMode === 1) return;
 		if (!next && isPreviewEnabled) lastPreviewKey = activeKey;
 		isPreviewMode = next;
 	};
 
 	$effect(() => {
-		if (playerMode === 1) return;
 		setPreviewMode(isFutureEnabled);
 	});
 
@@ -2680,6 +2678,10 @@
 		if (!isHistoryClickEnabled) return;
 
 		if (playerMode === 1) {
+			if (isPreviewEnabled) {
+				setActiveKey(next);
+				return;
+			}
 			const id = baselineIdByKey[next];
 			if (id === undefined) return;
 			setRealCursor(id);
@@ -3084,7 +3086,7 @@
 				setFutureEnabled={(next) => {
 					isFutureToggled = isFutureHeld !== next;
 				}}
-				isFutureToggleDisabled={playerMode === 1}
+				isFutureToggleDisabled={false}
 				{clockStarted}
 				{clockPaused}
 				clockEnabled={clockSettings.enabled}
@@ -3227,7 +3229,7 @@
 								? ` (${sharedPreviewHolderCount})`
 								: ""}
 						</div>
-					{:else if playerMode !== 1 && isPreviewEnabled}
+					{:else if isPreviewEnabled}
 						<div class="ctrlHeld" title="Preview mode (holding f)">F HELD</div>
 					{/if}
 				</div>
@@ -3253,12 +3255,13 @@
 			<div class="historyNote">
 				hover: preview • click: jump • right click: delete branch
 			</div>
-			{#if playerMode !== 1}
-				<div class="historyNote">
-					future mode: {isPreviewEnabled ? "on" : "off"} (hold f). future mode lets
-					you explore game branches without affecting the real multiplayer game
-				</div>
-			{/if}
+			<div class="historyNote">
+				future mode: {isPreviewEnabled ? "on" : "off"} (hold f). future mode lets
+				you explore game branches without affecting the real game{playerMode ===
+				1
+					? ""
+					: " other players see"}
+			</div>
 		</div>
 	</div>
 </div>
