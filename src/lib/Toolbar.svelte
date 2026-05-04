@@ -291,82 +291,84 @@
 			</label>
 		</div>
 
-		<div class="timerRow" style:margin-top="8px">
-			<div class="timerGrid" aria-label="Turn timer">
-				<div class="timerHalf" class:active={clockActivePlayer === 1}>
-					<div class="timerPlayer muted">p1</div>
-					<div class="timerValue" class:overtime={clockRemainingMsP1 < 0}>
-						{formatMs(clockRemainingMsP1)}
+		<div class="timerIndent">
+			<div class="timerRow" style:margin-top="8px">
+				<div class="timerGrid" aria-label="Turn timer">
+					<div class="timerHalf" class:active={clockActivePlayer === 1}>
+						<div class="timerPlayer muted">p1</div>
+						<div class="timerValue" class:overtime={clockRemainingMsP1 < 0}>
+							{formatMs(clockRemainingMsP1)}
+						</div>
+					</div>
+					<div class="timerHalf" class:active={clockActivePlayer === 2}>
+						<div class="timerPlayer muted">p2</div>
+						<div class="timerValue" class:overtime={clockRemainingMsP2 < 0}>
+							{formatMs(clockRemainingMsP2)}
+						</div>
 					</div>
 				</div>
-				<div class="timerHalf" class:active={clockActivePlayer === 2}>
-					<div class="timerPlayer muted">p2</div>
-					<div class="timerValue" class:overtime={clockRemainingMsP2 < 0}>
-						{formatMs(clockRemainingMsP2)}
-					</div>
+				<button
+					class="iconBtn"
+					disabled={!clockEnabled}
+					title={clockPaused ? "Resume turn timer" : "Pause turn timer"}
+					aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
+					onclick={toggleClockPaused}
+				>
+					<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+						{#if clockPaused}
+							<path
+								d="M9 7.2v9.6L17.4 12 9 7.2Z"
+								fill="currentColor"
+								opacity="0.9"
+							/>
+						{:else}
+							<path
+								d="M7.5 6.5h3v11h-3v-11Zm6 0h3v11h-3v-11Z"
+								fill="currentColor"
+								opacity="0.9"
+							/>
+						{/if}
+					</svg>
+				</button>
+			</div>
+
+			<div class="timerRow" style:margin-top="6px">
+				<div class="timerParams">
+					<label class="timerParam">
+						<span class="muted">total</span>
+						<input
+							class="timerInput"
+							inputmode="numeric"
+							aria-label="Turn timer total seconds"
+							bind:value={totalSecondsDraft}
+							onblur={commitTotal}
+							onkeydown={(e) => {
+								if (e.key === "Enter") commitTotal();
+							}}
+						/>
+					</label>
+					<label class="timerParam">
+						<span class="muted">gain</span>
+						<input
+							class="timerInput"
+							inputmode="numeric"
+							aria-label="Turn timer gain seconds"
+							bind:value={gainSecondsDraft}
+							onblur={commitGain}
+							onkeydown={(e) => {
+								if (e.key === "Enter") commitGain();
+							}}
+						/>
+					</label>
 				</div>
 			</div>
-			<button
-				class="iconBtn"
-				disabled={!clockEnabled}
-				title={clockPaused ? "Resume turn timer" : "Pause turn timer"}
-				aria-label={clockPaused ? "Resume turn timer" : "Pause turn timer"}
-				onclick={toggleClockPaused}
-			>
-				<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-					{#if clockPaused}
-						<path
-							d="M9 7.2v9.6L17.4 12 9 7.2Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					{:else}
-						<path
-							d="M7.5 6.5h3v11h-3v-11Zm6 0h3v11h-3v-11Z"
-							fill="currentColor"
-							opacity="0.9"
-						/>
-					{/if}
-				</svg>
-			</button>
-		</div>
 
-		<div class="timerRow" style:margin-top="6px">
-			<div class="timerParams">
-				<label class="timerParam">
-					<span class="muted">total</span>
-					<input
-						class="timerInput"
-						inputmode="numeric"
-						aria-label="Turn timer total seconds"
-						bind:value={totalSecondsDraft}
-						onblur={commitTotal}
-						onkeydown={(e) => {
-							if (e.key === "Enter") commitTotal();
-						}}
-					/>
-				</label>
-				<label class="timerParam">
-					<span class="muted">gain</span>
-					<input
-						class="timerInput"
-						inputmode="numeric"
-						aria-label="Turn timer gain seconds"
-						bind:value={gainSecondsDraft}
-						onblur={commitGain}
-						onkeydown={(e) => {
-							if (e.key === "Enter") commitGain();
-						}}
-					/>
-				</label>
-			</div>
+			{#if !clockEnabled}
+				<div class="timerNote muted">disabled</div>
+			{:else if !clockStarted}
+				<div class="timerNote muted">starts after p1’s first move</div>
+			{/if}
 		</div>
-
-		{#if !clockEnabled}
-			<div class="timerNote muted">disabled</div>
-		{:else if !clockStarted}
-			<div class="timerNote muted">starts after p1’s first move</div>
-		{/if}
 
 		<div class="buttons" style:margin-top="10px">
 			<button class="btn" disabled={isUndoDisabled} onclick={undo}>undo</button>
@@ -727,6 +729,10 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 10px;
+	}
+
+	.timerIndent {
+		margin-left: 14px;
 	}
 
 	.keyRow {
