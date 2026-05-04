@@ -3238,7 +3238,7 @@
 			</div>
 			{#if playerMode !== 1}
 				<div class="historyNote">
-					preview mode: {isPreviewEnabled ? "on" : "off"} (hold f). preview mode lets
+					future mode: {isPreviewEnabled ? "on" : "off"} (hold f). future mode lets
 					you explore game branches without affecting the real multiplayer game
 				</div>
 			{/if}

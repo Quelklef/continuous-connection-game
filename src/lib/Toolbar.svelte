@@ -661,23 +661,17 @@
 				<div>pan</div>
 				<div class="keycap">e</div>
 				<div>extra info</div>
-				<div class="keycap">shift+e</div>
-				<div>toggle extra info</div>
 				<div class="keycap">r + scroll</div>
 				<div>rotate stone</div>
 				<div class="keycap">r + ctrl + scroll</div>
 				<div>rotate stone (fine)</div>
-				<div class="keycap">shift+r</div>
-				<div>toggle rotation mode</div>
 				<div class="keycap">b</div>
 				<div>component borders</div>
-				<div class="keycap">shift+b</div>
-				<div>toggle component borders</div>
+				<div class="keycap">shift + (e/r/b/f)</div>
+				<div>toggle mode</div>
 				{#if isMultiplayerEnabled}
 					<div class="keycap">f</div>
-					<div>preview future moves</div>
-					<div class="keycap">shift+f</div>
-					<div>toggle preview</div>
+					<div>future mode</div>
 					<div class="keycap">f + ctrl</div>
 					<div>shared preview (send/receive)</div>
 				{/if}
