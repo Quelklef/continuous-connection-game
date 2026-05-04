@@ -481,13 +481,19 @@
 				<div class="keyRowRight">
 					<div class="muted">{Math.round(zoomX * 100) / 100}×</div>
 					<button
-						class="iconBtn"
+						class="iconBtn miniBtn"
 						title={isZoomAtOneX ? "Already at 1×" : "Reset view"}
 						aria-label="Reset view"
 						disabled={isZoomAtOneX}
 						onclick={resetView}
 					>
-						reset
+						<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+							<path
+								d="M6.2 8.5A7 7 0 1 1 5 12h2a5 5 0 1 0 1.2-3.2L10 10.6V5H5l1.2 1.2Z"
+								fill="currentColor"
+								opacity="0.9"
+							/>
+						</svg>
 					</button>
 				</div>
 			</div>
