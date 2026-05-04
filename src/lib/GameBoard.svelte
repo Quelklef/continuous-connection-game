@@ -3001,24 +3001,23 @@
 							<pattern
 								id="latestMoveHatch"
 								patternUnits="userSpaceOnUse"
-								width="0.16"
-								height="0.16"
-								patternTransform="rotate(45)"
+								width="0.18"
+								height="0.18"
 							>
 								<line
 									x1="0"
 									y1="0"
-									x2="0"
-									y2="0.16"
+									x2="0.18"
+									y2="0.18"
 									stroke="black"
 									stroke-opacity="0.55"
 									stroke-width="0.035"
 								/>
 								<line
-									x1="0.08"
-									y1="0"
-									x2="0.08"
-									y2="0.16"
+									x1="0"
+									y1="0.18"
+									x2="0.18"
+									y2="0"
 									stroke="black"
 									stroke-opacity="0.55"
 									stroke-width="0.035"
